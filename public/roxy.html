@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Roxy's Birthday</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      text-align: center;
+      overflow: hidden;
+      position: fixed;
+      width: 100%;
+    }
+
+    .container {
+      width: 100%;
+      /* Use the full width of its container */
+      max-width: 800px;
+      /* But limit the maximum width */
+      padding: 20px;
+      /* Padding inside the container */
+      box-sizing: border-box;
+      /* Include padding in width calculations */
+    }
+
+    .message {
+      font-size: 48px;
+      /* Large text size */
+    }
+
+    @media screen and (max-width: 600px) {
+      .container {
+        padding: 10px;
+        /* Smaller padding on smaller screens */
+      }
+
+      .message {
+        font-size: 36px;
+        /* Slightly smaller text on smaller screens */
+      }
+    }
+  </style>
+  <script src="scripts/bundle.js" defer></script>
+</head>
+
+<body>
+  <div class="container">
+    <h2 class="message"></h2>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+  <script>
+    const birthday = new Date(new Date().getFullYear(), 0, 17);
+    const messageElement = document.querySelector('.message');
+    const fractions = [
+      {
+        fraction: '1/1',
+        days: 0
+      },
+      {
+        fraction: '1/12',
+        days: 365.25 / 12.0
+      },
+      {
+        fraction: '1/6',
+        days: 365.25 / 6.0
+      },
+      {
+        fraction: '1/8',
+        days: 365.25 * 0.125
+      },
+      {
+        fraction: '1/4',
+        days: 365.25 * 0.25
+      },
+      {
+        fraction: '1/3',
+        days: 365.25 / 3.0
+      },
+      {
+        fraction: '3/8',
+        days: 365.25 * 0.375
+      },
+      {
+        fraction: '5/12',
+        days: 365.25 * 5 / 12.0
+      },
+      {
+        fraction: '0.420',
+        days: 365.25 * 0.420
+      },
+      {
+        fraction: '1/2',
+        days: 365.25 * 0.5
+      },
+      {
+        fraction: '7/12',
+        days: 365.25 * 7 / 12.0
+      },
+      {
+        fraction: '5/8',
+        days: 365.25 * 0.625
+      },
+      {
+        fraction: '2/3',
+        days: 365.25 * 2 / 3.0
+      },
+      {
+        fraction: '0.69',
+        days: 365.25 * 0.69
+      },
+      {
+        fraction: '3/4',
+        days: 365.25 * 0.75
+      },
+      {
+        fraction: '5/6',
+        days: 365.25 * 5 / 6.0
+      },
+      {
+        fraction: '7/8',
+        days: 365.25 * 0.875
+      },
+      {
+        fraction: '11/12',
+        days: 365.25 * 11 / 12.0
+      },
+    ];
+
+    function getCurrentFraction(currentDays) {
+      for (const {
+        fraction,
+        days
+      }
+        of fractions) {
+        if (Math.abs(currentDays - Math.floor(days)) < 1) {
+          return fraction;
+        }
+      }
+      return '';
+    }
+
+    function getNextFraction(currentDays) {
+      for (const {
+        fraction,
+        days
+      }
+        of fractions) {
+        if (currentDays < days) {
+          return {
+            fraction,
+            days
+          };
+        }
+      }
+      return {
+        fraction: '1',
+        days: 365.25
+      };
+    }
+
+    function updateMessage() {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const daysSinceLastBirthday = Math.ceil((today - birthday) / (1000 * 60 * 60 * 24));
+      const currentFraction = getCurrentFraction(daysSinceLastBirthday);
+      let message = '';
+      if (currentFraction) {
+        if (currentFraction === '1/1') {
+          message = 'It is Roxy\'s birthday 🎉🎉🎉';
+        } else {
+          message = `It is Roxy's ${currentFraction} birthday 🎉🎉🎉`;
+        }
+        launchConfetti();
+      } else {
+        const {
+          fraction: nextFraction,
+          days: nextFractionDays
+        } = getNextFraction(daysSinceLastBirthday);
+        const daysUntilNextFraction = Math.floor(nextFractionDays - daysSinceLastBirthday);
+        if (nextFraction === '1/1') {
+          message = `Roxy's next birthday is in ${daysUntilNextFraction} days 🎉`;
+        } else {
+          message = `Roxy's next ${nextFraction} birthday is in ${daysUntilNextFraction} days 🎉`;
+        }
+      }
+      // Display the message
+      messageElement.textContent = message;
+    }
+
+    function launchConfetti() {
+      var duration = 20.0 * 1000;
+      var animationEnd = Date.now() + duration;
+      var defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
+
+      function randomInRange(min, max) {
+        return Math.random() * (max - min) + min;
+      }
+
+      var interval = setInterval(function () {
+        var timeLeft = animationEnd - Date.now();
+
+        if (timeLeft <= 0) {
+          return clearInterval(interval);
+        }
+
+        var particleCount = 50 * (timeLeft / duration);
+        // since particles fall down, start a bit higher than random
+        confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
+        confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
+      }, 250);
+    }
+
+    // Update the message initially
+    updateMessage();
+
+    // Update the message every minute
+    setInterval(() => {
+      const now = new Date();
+      if (now.getHours() === 0 && now.getMinutes() === 0) {
+        updateMessage();
+      }
+    }, 60000); // 60000 milliseconds = 1 minute 
+  </script>
+</body>
+
+</html>

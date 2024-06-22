@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mark Zakharyan</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        @media screen and (max-width: 600px) {
+            .container {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Mark Zakharyan</h1>
+        <h2>My website</h2>
+        <p>I use this domain to host various things. The lack of a sexy aesthetic IS the aesthetic. I'm a minimalist
+            (lazy)</p>
+        <br>
+        <p>Maybe you meant:</p>
+        <ul>
+            <li><a href="/fourier.html">Fourier Visualization</a></li>
+            <li><a href="/roxy.html">Roxy's Birthday</a></li>
+            <li><a href="mailto:markzakharyan@ucsb.edu">My Email</a></li>
+            <li><a href="https://github.com/markzakharyan">My Github</a></li>
+        </ul>
+        <br>
+        <div id="user-area">
+            <h2 id="welcome">Welcome, <span id="user-name"><%= user.name %></span>!</h2>
+            <p>You are signed in.</p>
+            <button onclick="logout()">Sign out</button>
+        </div>
+    </div>
+    <script>
+        function logout() {
+            fetch('/logout', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.reload();
+                    }
+                });
+        }
+    </script>
+</body>
+
+</html>

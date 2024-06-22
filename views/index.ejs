@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mark Zakharyan</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        @media screen and (max-width: 600px) {
+            .container {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Mark Zakharyan</h1>
+        <h2>My website</h2>
+        <p>I use this domain to host various things. The lack of a sexy aesthetic IS the aesthetic. I'm a minimalist
+            (lazy)</p>
+        <br>
+        <p>Maybe you meant:</p>
+        <ul>
+            <li><a href="/fourier.html">Fourier Visualization</a></li>
+            <li><a href="/roxy.html">Roxy's Birthday</a></li>
+            <li><a href="mailto:markzakharyan@ucsb.edu">My Email</a></li>
+            <li><a href="https://github.com/markzakharyan">My Github</a></li>
+        </ul>
+        <br>
+        <div id="sign-in-area">
+            <p>Sign in:</p>
+            <form id="sign-in-form">
+                <input type="email" id="email" placeholder="Email" style="margin-right: 5px;" autocomplete="off">
+                <input type="password" id="password" placeholder="Password" style="margin-right: 5px;"
+                    autocomplete="off">
+                <button type="submit">Sign in</button>
+            </form>
+            <p id="error-msg" style="color: red;"></p>
+        </div>
+    </div>
+    <script>
+        document.getElementById('sign-in-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            login();
+        });
+
+
+        function login() {
+            var email = document.getElementById('email').value;
+            var password = document.getElementById('password').value;
+
+            fetch('/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ email, password }),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.reload();
+                    } else {
+                        throw new Error(data.error || 'Login failed');
+                    }
+                })
+                .catch((error) => {
+                    document.getElementById('error-msg').innerText = error.message;
+                    setTimeout(() => {
+                        document.getElementById('error-msg').innerText = '';
+                    }, 5000);
+                });
+        }
+
+    </script>
+</body>
+
+</html>

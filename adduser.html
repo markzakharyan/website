@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mark Zakharyan</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    @media screen and (max-width: 600px) {
+      .container {
+        padding: 10px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>Add User</h1>
+    <form id="add-user-form">
+      <input type="text" id="name" placeholder="Name" style="margin-right: 5px;" autocomplete="off">
+      <input type="email" id="email" placeholder="Email" style="margin-right: 5px;" autocomplete="off">
+      <input type="password" id="password" placeholder="Password" style="margin-right: 5px;" autocomplete="off">
+      <button type="submit">Add user</button>
+    </form>
+    <p id="error-msg" style="color: red;"></p>
+  </div>
+  <script>
+    document.getElementById('add-user-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('name').value;
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const response = await fetch('/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name,
+          email,
+          password
+        })
+      });
+      const data = await response.json();
+      if (data.error) {
+        document.getElementById('error-msg').textContent = data.error;
+      } else {
+        document.getElementById('error-msg').textContent = '';
+        alert('User added successfully');
+      }
+    });
+  </script>
+</body>
+
+</html>
