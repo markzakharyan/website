@@ -17,6 +17,16 @@ firebase-debug.*.log*
 # it commented so all members can deploy to the same project(s) in .firebaserc.
 # .firebaserc
 
+# OS generated files #
+######################
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
 # Runtime data
 pids
 *.pid
