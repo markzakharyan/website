@@ -2,7 +2,7 @@
 <html>
 
 <head>
-  <title>Roxy's Birthday</title>
+  <title>Birthday Countdown</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -20,124 +20,114 @@
 
     .container {
       width: 100%;
-      /* Use the full width of its container */
       max-width: 800px;
-      /* But limit the maximum width */
       padding: 20px;
-      /* Padding inside the container */
       box-sizing: border-box;
-      /* Include padding in width calculations */
     }
 
     .message {
       font-size: 48px;
-      /* Large text size */
+      position: relative;
+    }
+
+    .name-select {
+      cursor: pointer;
+      position: relative;
+      display: inline-block;
+      margin-right: -12px;
+    }
+
+    .name-select::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -2px;
+      height: 1px;
+      background-color: #000;
+      opacity: 0.3;
+    }
+
+    .name-select::before {
+      content: 'select';
+      position: absolute;
+      /* left: 50%; */
+      /* transform: translateX(-50%); */
+      bottom: -15px;
+      font-size: 10px;
+      opacity: 0.5;
+    }
+
+
+
+    .dropdown {
+      display: none;
+      position: absolute;
+      background: white;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 5px 0;
+      left: 0;
+      top: 100%;
+      z-index: 1;
+      width: max-content;
+    }
+
+    .dropdown div {
+      padding: 5px 10px;
+      white-space: nowrap;
+      /* Prevent wrapping of names */
+    }
+
+    .dropdown div:hover {
+      background-color: #f0f0f0;
     }
 
     @media screen and (max-width: 600px) {
-      .container {
-        padding: 10px;
-        /* Smaller padding on smaller screens */
-      }
-
       .message {
         font-size: 36px;
-        /* Slightly smaller text on smaller screens */
       }
     }
   </style>
-  <script src="scripts/bundle.js" defer></script>
 </head>
 
 <body>
   <div class="container">
-    <h2 class="message"></h2>
+    <h2 class="message">
+      <span class="name-select" id="nameSelect">Roxy</span>
+      <div class="dropdown" id="dropdown"></div>
+      <span id="messageContent"></span>
+    </h2>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
   <script>
-    const birthday = new Date(new Date().getFullYear(), 0, 17);
-    const messageElement = document.querySelector('.message');
+    const nameSelect = document.getElementById('nameSelect');
+    const dropdown = document.getElementById('dropdown');
+    const messageContent = document.getElementById('messageContent');
+
+
+
+    const people = {
+      Roxy: new Date(new Date().getFullYear(), 0, 17),
+      Alex: new Date(new Date().getFullYear(), 3, 15),
+      Sam: new Date(new Date().getFullYear(), 6, 30),
+    };
+
     const fractions = [
-      {
-        fraction: '1/1',
-        days: 0
-      },
-      {
-        fraction: '1/12',
-        days: 365.25 / 12.0
-      },
-      {
-        fraction: '1/6',
-        days: 365.25 / 6.0
-      },
-      {
-        fraction: '1/8',
-        days: 365.25 * 0.125
-      },
-      {
-        fraction: '1/4',
-        days: 365.25 * 0.25
-      },
-      {
-        fraction: '1/3',
-        days: 365.25 / 3.0
-      },
-      {
-        fraction: '3/8',
-        days: 365.25 * 0.375
-      },
-      {
-        fraction: '5/12',
-        days: 365.25 * 5 / 12.0
-      },
-      {
-        fraction: '0.420',
-        days: 365.25 * 0.420
-      },
-      {
-        fraction: '1/2',
-        days: 365.25 * 0.5
-      },
-      {
-        fraction: '7/12',
-        days: 365.25 * 7 / 12.0
-      },
-      {
-        fraction: '5/8',
-        days: 365.25 * 0.625
-      },
-      {
-        fraction: '2/3',
-        days: 365.25 * 2 / 3.0
-      },
-      {
-        fraction: '0.69',
-        days: 365.25 * 0.69
-      },
-      {
-        fraction: '3/4',
-        days: 365.25 * 0.75
-      },
-      {
-        fraction: '5/6',
-        days: 365.25 * 5 / 6.0
-      },
-      {
-        fraction: '7/8',
-        days: 365.25 * 0.875
-      },
-      {
-        fraction: '11/12',
-        days: 365.25 * 11 / 12.0
-      },
+      { fraction: '1/1', days: 0 },
+      { fraction: '1/12', days: 365.25 / 12.0 },
+      { fraction: '1/6', days: 365.25 / 6.0 },
+      { fraction: '1/4', days: 365.25 * 0.25 },
+      { fraction: '1/3', days: 365.25 / 3.0 },
+      { fraction: '1/2', days: 365.25 * 0.5 },
+      { fraction: '2/3', days: 365.25 * 2 / 3.0 },
+      { fraction: '3/4', days: 365.25 * 0.75 },
+      { fraction: '5/6', days: 365.25 * 5 / 6.0 },
+      { fraction: '11/12', days: 365.25 * 11 / 12.0 },
     ];
 
     function getCurrentFraction(currentDays) {
-      for (const {
-        fraction,
-        days
-      }
-        of fractions) {
+      for (const { fraction, days } of fractions) {
         if (Math.abs(currentDays - Math.floor(days)) < 1) {
           return fraction;
         }
@@ -146,55 +136,45 @@
     }
 
     function getNextFraction(currentDays) {
-      for (const {
-        fraction,
-        days
-      }
-        of fractions) {
+      for (const { fraction, days } of fractions) {
         if (currentDays < days) {
-          return {
-            fraction,
-            days
-          };
+          return { fraction, days };
         }
       }
-      return {
-        fraction: '1',
-        days: 365.25
-      };
+      return { fraction: '1', days: 365.25 };
     }
 
     function updateMessage() {
+      const selectedName = nameSelect.textContent;
+      const birthday = people[selectedName];
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const daysSinceLastBirthday = Math.ceil((today - birthday) / (1000 * 60 * 60 * 24));
       const currentFraction = getCurrentFraction(daysSinceLastBirthday);
       let message = '';
+
       if (currentFraction) {
         if (currentFraction === '1/1') {
-          message = 'It is Roxy\'s birthday 🎉🎉🎉';
+          message = `'s birthday is today 🎉🎉🎉`;
         } else {
-          message = `It is Roxy's ${currentFraction} birthday 🎉🎉🎉`;
+          message = `'s ${currentFraction} birthday is today 🎉🎉🎉`;
         }
         launchConfetti();
       } else {
-        const {
-          fraction: nextFraction,
-          days: nextFractionDays
-        } = getNextFraction(daysSinceLastBirthday);
+        const { fraction: nextFraction, days: nextFractionDays } = getNextFraction(daysSinceLastBirthday);
         const daysUntilNextFraction = Math.floor(nextFractionDays - daysSinceLastBirthday);
         if (nextFraction === '1/1') {
-          message = `Roxy's next birthday is in ${daysUntilNextFraction} days 🎉`;
+          message = `'s next birthday is in ${daysUntilNextFraction} days 🎉`;
         } else {
-          message = `Roxy's next ${nextFraction} birthday is in ${daysUntilNextFraction} days 🎉`;
+          message = `'s next ${nextFraction} birthday is in ${daysUntilNextFraction} days 🎉`;
         }
       }
-      // Display the message
-      messageElement.textContent = message;
+
+      messageContent.textContent = message;
     }
 
     function launchConfetti() {
-      var duration = 20.0 * 1000;
+      var duration = 5 * 1000;
       var animationEnd = Date.now() + duration;
       var defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
 
@@ -210,22 +190,62 @@
         }
 
         var particleCount = 50 * (timeLeft / duration);
-        // since particles fall down, start a bit higher than random
         confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
         confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
       }, 250);
     }
 
-    // Update the message initially
-    updateMessage();
+    function updateDropdown() {
+      const selectedName = nameSelect.textContent;
+      dropdown.innerHTML = '';
 
-    // Update the message every minute
+      Object.keys(people).forEach(name => {
+        if (name !== selectedName) {
+          const option = document.createElement('div');
+          option.textContent = name;
+          option.addEventListener('click', () => {
+            nameSelect.textContent = name;
+            dropdown.style.display = 'none';
+            updateMessage();
+            updateDropdown(); // Update dropdown after selection
+          });
+          dropdown.appendChild(option);
+        }
+      });
+    }
+
+    nameSelect.addEventListener('click', (event) => {
+      event.stopPropagation();
+      updateDropdown();
+      dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+
+      dropdown.style.left = `${nameSelect.offsetLeft}px`;
+      dropdown.style.top = `${nameSelect.offsetTop + nameSelect.offsetHeight}px`;
+    });
+
+    dropdown.querySelectorAll('div').forEach(option => {
+      option.addEventListener('click', () => {
+        nameSelect.textContent = option.textContent;
+        dropdown.style.display = 'none';
+        updateMessage();
+      });
+    });
+
+    document.addEventListener('click', (event) => {
+      if (!nameSelect.contains(event.target) && !dropdown.contains(event.target)) {
+        dropdown.style.display = 'none';
+      }
+    });
+
+    updateMessage();
+    updateDropdown();
+
     setInterval(() => {
       const now = new Date();
       if (now.getHours() === 0 && now.getMinutes() === 0) {
         updateMessage();
       }
-    }, 60000); // 60000 milliseconds = 1 minute 
+    }, 60000);
   </script>
 </body>
 
