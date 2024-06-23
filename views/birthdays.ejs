@@ -167,15 +167,16 @@
       const birthday = new Date(person.bday);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
+      birthday.setHours(0, 0, 0, 0);
+      birthday.setDate(birthday.getDate()+1);
 
       let birthdayThisYear = new Date(today.getFullYear(), birthday.getMonth(), birthday.getDate());
 
-      // Fix: Check if birthday this year has already passed
-      if (birthdayThisYear > today) {
-        birthdayThisYear.setFullYear(birthdayThisYear.getFullYear() - 1);
-      }
-      let daysSinceLastBirthday = Math.ceil((today - birthdayThisYear) / (1000 * 60 * 60 * 24));
+      let daysSinceLastBirthday = (today - birthdayThisYear) / (1000 * 60 * 60 * 24);
 
+    if (daysSinceLastBirthday < 0) {
+      daysSinceLastBirthday = 365.25 + (today - birthdayThisYear) / (1000 * 60 * 60 * 24);
+    }
 
 
       console.log(`${person.name}'s birthday:`, birthday);
