@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - Mark Zakharyan</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f0f0;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        form {
+            margin-top: 20px;
+        }
+
+        label {
+            display: block;
+            margin-top: 10px;
+        }
+
+        input[type="email"],
+        input[type="text"],
+        input[type="password"],
+        input[type="date"] {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin-top: 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .error {
+            color: #d32f2f;
+            margin-top: 10px;
+        }
+
+        #birthdayOptInContainer {
+            display: none;
+            margin-top: 10px;
+        }
+
+        @media screen and (max-width: 600px) {
+            .container {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Register</h1>
+        <form action="/register" method="POST">
+            <% if (typeof error !== 'undefined') { %>
+                <p class="error"><%= error %></p>
+            <% } %>
+            
+            <label for="email">Email:</label>
+            <input type="email" id="email" name="email" required>
+            
+            <label for="firstname">First Name:</label>
+            <input type="text" id="firstname" name="firstname" required>
+            
+            <label for="lastname">Last Name:</label>
+            <input type="text" id="lastname" name="lastname" required>
+            
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" required>
+            
+            <label for="confirm_password">Confirm Password:</label>
+            <input type="password" id="confirm_password" name="confirm_password" required>
+            
+            <label for="birthday">Birthday (optional):</label>
+            <input type="date" id="birthday" name="birthday">
+            
+            <div id="birthdayOptInContainer">
+                <label>
+                    <input type="checkbox" id="birthdayOptIn" name="birthdayOptIn">
+                    Would you like to be added to the birthday countdown list?
+                </label>
+            </div>
+            
+            <button type="submit">Register</button>
+        </form>
+        <p><a href="/">Back to Home</a></p>
+    </div>
+
+    <script>
+        document.getElementById('birthday').addEventListener('change', function() {
+            var birthdayOptInContainer = document.getElementById('birthdayOptInContainer');
+            if (this.value) {
+                birthdayOptInContainer.style.display = 'block';
+            } else {
+                birthdayOptInContainer.style.display = 'none';
+                document.getElementById('birthdayOptIn').checked = false;
+            }
+        });
+    </script>
+</body>
+
+</html>

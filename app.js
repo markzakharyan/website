@@ -1,17 +1,26 @@
 const express = require("express");
-const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const path = require("path");
 const sqlite3 = require("sqlite3").verbose();
-const cookieParser = require("cookie-parser");
+const session = require('express-session');
 
 const app = express();
 const port = 3000;
 
-app.use(cookieParser());
-
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(express.static("public"));
+
+const isProduction = process.env.NODE_ENV === 'production';
+
+
+// Set up session middleware
+app.use(session({
+  secret: 'your_secret_key', // Replace with a real secret key
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: isProduction } // Set to true if using https
+}));
 
 // Set EJS as the view engine
 app.set("view engine", "ejs");
@@ -46,166 +55,23 @@ const db = new sqlite3.Database("./users.db", (err) => {
 });
 
 // Middleware to check if user is authenticated
-function authenticateToken(req, res, next) {
-  const token = req.cookies.token;
-
-  jwt.verify(token, "your_secret_key", (err, user) => {
-    req.user = user;
+function isAuthenticated(req, res, next) {
+  if (req.session.userId) {
     next();
-  });
-}
-
-// Serve home page
-app.get("/", authenticateToken, (req, res) => {
-  if (req.user) {
-    db.get(
-      "SELECT * FROM users WHERE id = ?",
-      [req.user.userId],
-      (err, user) => {
-        if (err) {
-          console.error("Error fetching user:", err);
-          return res.status(500).send("Internal Server Error");
-        }
-        if (user) {
-          if (user.isadmin) {
-            res.render("index_loggedin_admin", { user: user });
-          }
-          res.render("index_loggedin", { user: user });
-        } else {
-          res.clearCookie("token");
-          res.render("index");
-        }
-      }
-    );
   } else {
-    res.render("index");
+    res.status(401).send("Unauthorized");
   }
-});
-
-app.get("/roxy", (req, res) => {
-  res.render("roxy");
-});
-
-app.get("/fourier", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "fourier.html"));
-});
-
-app.get("/manage_users", authenticateToken, isAdmin, (req, res) => {
-  res.render("manage_users");
-});
-
-// User registration
-app.post("/register", async (req, res) => {
-  const { name, email, password } = req.body;
-  try {
-    const hashedPassword = await bcrypt.hash(password, 10);
-    db.run(
-      "INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
-      [name, email, hashedPassword],
-      function (err) {
-        if (err) {
-          return res.status(400).json({ error: "Email already exists" });
-        }
-        res.status(201).json({ message: "User registered successfully" });
-      }
-    );
-  } catch (error) {
-    res.status(500).json({ error: "Error registering user" });
-  }
-});
-
-// User login
-app.post("/login", (req, res) => {
-  const { email, password } = req.body;
-  console.log("Login attempt:", email);
-
-  db.get("SELECT * FROM users WHERE email = ?", [email], async (err, user) => {
-    if (err) {
-      console.error("Database error:", err);
-      return res
-        .status(500)
-        .json({ success: false, error: "Error accessing database" });
-    }
-    if (!user) {
-      console.log("User not found:", email);
-      return res
-        .status(400)
-        .json({ success: false, error: "Invalid credentials" });
-    }
-    try {
-      const isMatch = await bcrypt.compare(password, user.password);
-      console.log("Password match:", isMatch);
-      if (isMatch) {
-        const token = jwt.sign({ userId: user.id }, "your_secret_key", {
-          expiresIn: "1h",
-        });
-        res.cookie("token", token, { httpOnly: true, maxAge: 3600000 }); // 1 hour
-        console.log("Login successful:", email);
-        return res.json({ success: true, user: user });
-      } else {
-        console.log("Password mismatch:", email);
-        return res
-          .status(400)
-          .json({ success: false, error: "Invalid credentials" });
-      }
-    } catch (error) {
-      console.error("Login error:", error);
-      return res
-        .status(500)
-        .json({ success: false, error: "Error logging in" });
-    }
-  });
-});
-
-// Logout
-app.post("/logout", (req, res) => {
-  res.clearCookie("token");
-  res.json({ success: true });
-});
-
-// Get all users
-app.get("/users", authenticateToken, isAdmin, (req, res) => {
-  if (!req.user) {
-    return res.status(401).send("Unauthorized");
-  }
-
-  db.get(
-    "SELECT * FROM users WHERE id = ?",
-    [req.user.userId],
-    async (err, user) => {
-      if (err) {
-        console.error("Error fetching user:", err);
-        return res.status(500).send("Internal Server Error");
-      }
-      if (!user) {
-        return res.status(404).send("User not found");
-      }
-
-      db.all(
-        "SELECT id, email, firstname, lastname, birthday, birthdayOptIn, isadmin FROM users",
-        (err, users) => {
-          if (err) {
-            console.error("Error fetching users:", err);
-            return res.status(500).send("Internal Server Error");
-          }
-          res.json(users);
-        }
-      );
-    }
-  );
-});
-
-app.use(express.json());
+}
 
 // Middleware to check if user is admin
 function isAdmin(req, res, next) {
-  if (!req.user || !req.user.userId) {
+  if (!req.session.userId) {
     return res.status(401).send("Unauthorized");
   }
 
   db.get(
     "SELECT isadmin FROM users WHERE id = ?",
-    [req.user.userId],
+    [req.session.userId],
     (err, user) => {
       if (err) {
         console.error("Database error:", err);
@@ -222,17 +88,194 @@ function isAdmin(req, res, next) {
   );
 }
 
+// Serve home page
+app.get("/", (req, res) => {
+  db.get(
+    "SELECT * FROM users WHERE id = ?",
+    [req.session.userId],
+    (err, user) => {
+      if (err) {
+        console.error("Error fetching user:", err);
+        return res.status(500).send("Internal Server Error");
+      }
+      if (user) {
+        if (user.isadmin) {
+          res.render("index_loggedin_admin", { user: user });
+        } else {
+          res.render("index_loggedin", { user: user });
+        }
+      } else {
+        req.session.destroy((err) => {
+          if (err) {
+            console.error("Error destroying session:", err);
+          }
+          res.render('index');
+        });
+      }
+    }
+  );
+});
+
+app.get("/roxy", (req, res) => {
+  res.render("birthdays");
+});
+
+app.get("/birthdays", (req, res) => {
+  res.render("birthdays");
+});
+
+app.get("/fourier", (req, res) => {
+  res.render("fourier");
+});
+
+app.get("/manage_users", isAuthenticated, isAdmin, (req, res) => {
+  res.render("manage_users");
+});
+
+// GET route to display the registration form
+app.get('/register', (req, res) => {
+  res.render('register');
+});
+
+// POST route to handle form submission
+app.post('/register', async (req, res) => {
+  const { email, firstname, lastname, password, confirm_password, birthday, birthdayOptIn } = req.body;
+
+  // Check if required fields are present
+  if (!email || !firstname || !lastname || !password || !confirm_password) {
+    return res.render('register', { error: 'All required fields must be filled' });
+  }
+
+  if (password !== confirm_password) {
+    return res.render('register', { error: 'Passwords do not match' });
+  }
+
+  try {
+    db.get('SELECT * FROM users WHERE email = ?', [email], async (err, user) => {
+      if (err) {
+        console.error(err);
+        return res.render('register', { error: 'An error occurred' });
+      }
+      if (user) {
+        return res.render('register', { error: 'Email already in use' });
+      }
+
+      try {
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const stmt = db.prepare(`
+          INSERT INTO users (email, firstname, lastname, password, birthday, birthdayOptIn, isadmin)
+          VALUES (?, ?, ?, ?, ?, ?, 0)
+        `);
+
+        stmt.run([
+          email, 
+          firstname, 
+          lastname, 
+          hashedPassword, 
+          birthday || null, 
+          birthdayOptIn ? 1 : 0
+        ], function(err) {
+          if (err) {
+            console.error('Error registering new user:', err);
+            return res.render('register', { error: 'Error registering user' });
+          }
+          
+          req.session.userId = this.lastID;
+          req.session.email = email;
+          res.redirect('/');
+        });
+
+        stmt.finalize();
+      } catch (hashError) {
+        console.error('Error hashing password:', hashError);
+        return res.render('register', { error: 'Error processing password' });
+      }
+    });
+  } catch (error) {
+    console.error('Error in registration process:', error);
+    res.render('register', { error: 'An error occurred during registration' });
+  }
+});
+
+// User login
+app.post("/login", (req, res) => {
+  const { email, password } = req.body;
+  console.log("Login attempt:", email);
+
+  db.get("SELECT * FROM users WHERE email = ?", [email], async (err, user) => {
+    if (err) {
+      console.error("Database error:", err);
+      return res.status(500).json({ success: false, error: "Error accessing database" });
+    }
+    if (!user) {
+      console.log("User not found:", email);
+      return res.status(400).json({ success: false, error: "Invalid credentials" });
+    }
+    try {
+      const isMatch = await bcrypt.compare(password, user.password);
+      console.log("Password match:", isMatch);
+      if (isMatch) {
+        req.session.userId = user.id;
+        req.session.email = user.email;
+        console.log("Login successful:", email);
+        return res.json({ success: true, user: user });
+      } else {
+        console.log("Password mismatch:", email);
+        return res.status(400).json({ success: false, error: "Invalid credentials" });
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      return res.status(500).json({ success: false, error: "Error logging in" });
+    }
+  });
+});
+
+// Logout
+app.post("/logout", (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      console.error("Error destroying session:", err);
+      return res.status(500).json({ success: false, error: "Error logging out" });
+    }
+    res.json({ success: true });
+  });
+});
+
+// GET /birthdays - Get all users who have opted in to share their birthday
+app.get("/get_birthdays", (req, res) => {
+  db.all(
+    "SELECT id, firstname, birthday FROM users WHERE birthdayOptIn = 1",
+    (err, users) => {
+      if (err) {
+        console.error("Error fetching birthdays:", err);
+        return res.status(500).send("Internal Server Error");
+      }
+      const birthdays = users.map(user => {
+        const { id, firstname, birthday } = user;
+        return { id, name: firstname, bday: birthday };
+      });
+      res.json(birthdays);
+    }
+  );
+});
+
+// Get all users
+app.get("/users", isAuthenticated, isAdmin, (req, res) => {
+  db.all(
+    "SELECT id, email, firstname, lastname, birthday, birthdayOptIn, isadmin FROM users",
+    (err, users) => {
+      if (err) {
+        console.error("Error fetching users:", err);
+        return res.status(500).send("Internal Server Error");
+      }
+      res.json(users);
+    }
+  );
+});
+
 // POST /users - Add a new user
-app.post("/users", authenticateToken, isAdmin, async (req, res) => {
-  const {
-    email,
-    firstname,
-    lastname,
-    birthday,
-    birthdayOptIn,
-    isadmin,
-    password,
-  } = req.body;
+app.post("/users", isAuthenticated, isAdmin, async (req, res) => {
+  const { email, firstname, lastname, birthday, birthdayOptIn, isadmin, password } = req.body;
 
   if (!email || !firstname || !lastname || !password) {
     return res.status(400).send("Missing required fields");
@@ -246,23 +289,13 @@ app.post("/users", authenticateToken, isAdmin, async (req, res) => {
     `);
 
     stmt.run(
-      [
-        email,
-        firstname,
-        lastname,
-        birthday,
-        birthdayOptIn ? 1 : 0,
-        isadmin ? 1 : 0,
-        hashedPassword,
-      ],
+      [email, firstname, lastname, birthday, birthdayOptIn ? 1 : 0, isadmin ? 1 : 0, hashedPassword],
       function (err) {
         if (err) {
           console.error("Error adding new user:", err);
           return res.status(500).send("Error adding new user");
         }
-        res
-          .status(201)
-          .json({ id: this.lastID, message: "User added successfully" });
+        res.status(201).json({ id: this.lastID, message: "User added successfully" });
       }
     );
 
@@ -274,31 +307,16 @@ app.post("/users", authenticateToken, isAdmin, async (req, res) => {
 });
 
 // PUT /users/:id - Update an existing user
-app.put("/users/:id", authenticateToken, isAdmin, async (req, res) => {
+app.put("/users/:id", isAuthenticated, isAdmin, async (req, res) => {
   const userId = req.params.id;
-  const {
-    email,
-    firstname,
-    lastname,
-    birthday,
-    birthdayOptIn,
-    isadmin,
-    password,
-  } = req.body;
+  const { email, firstname, lastname, birthday, birthdayOptIn, isadmin, password } = req.body;
 
   if (!email || !firstname || !lastname) {
     return res.status(400).send("Missing required fields");
   }
 
   try {
-    let updateFields = [
-      email,
-      firstname,
-      lastname,
-      birthday,
-      birthdayOptIn ? 1 : 0,
-      isadmin ? 1 : 0,
-    ];
+    let updateFields = [email, firstname, lastname, birthday, birthdayOptIn ? 1 : 0, isadmin ? 1 : 0];
     let sql = `
       UPDATE users 
       SET email = ?, firstname = ?, lastname = ?, birthday = ?, birthdayOptIn = ?, isadmin = ?
@@ -330,7 +348,7 @@ app.put("/users/:id", authenticateToken, isAdmin, async (req, res) => {
 });
 
 // DELETE /users/:id - Delete a user
-app.delete("/users/:id", authenticateToken, isAdmin, (req, res) => {
+app.delete("/users/:id", isAuthenticated, isAdmin, (req, res) => {
   const userId = req.params.id;
 
   db.run("DELETE FROM users WHERE id = ?", userId, function (err) {
