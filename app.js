@@ -1,58 +1,64 @@
 const express = require("express");
 const bcrypt = require("bcrypt");
 const path = require("path");
-const sqlite3 = require("sqlite3").verbose();
-const session = require('express-session');
+const { Pool } = require("pg");
+const session = require("express-session");
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static("public"));
 
-// const isProduction = process.env.NODE_ENV === 'production';
-
-
 // Set up session middleware
-app.use(session({
-  secret: 'your_secret_key', // Replace with a real secret key
-  resave: false,
-  saveUninitialized: false,
-  cookie: { secure: false } // Set to true if using https
-}));
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "your_secret_key",
+    resave: false,
+    saveUninitialized: false,
+    cookie: { secure: process.env.NODE_ENV === "production" },
+  })
+);
 
 // Set EJS as the view engine
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
-// Set up the database
-const db = new sqlite3.Database("./users.db", (err) => {
-  if (err) {
-    console.error("Error opening database", err);
-  } else {
-    console.log("Connected to the SQLite database.");
-    db.run(
-      `CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      email TEXT UNIQUE,
-      firstname TEXT,
-      lastname TEXT,
-      birthday TEXT,
-      birthdayOptIn INTEGER,
-      isadmin INTEGER,
-      password TEXT
-    )`,
-      (err) => {
-        if (err) {
-          console.error("Error creating users table", err);
-        } else {
-          console.log("Users table ready");
-        }
-      }
-    );
-  }
+// Set up the database connection pool
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl:
+    process.env.NODE_ENV === "production"
+      ? { rejectUnauthorized: false }
+      : false,
 });
+
+// Initialize the database
+async function initializeDatabase() {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        email TEXT UNIQUE,
+        firstname TEXT,
+        lastname TEXT,
+        birthday TEXT,
+        birthdayOptIn BOOLEAN,
+        isadmin BOOLEAN,
+        password TEXT
+      )
+    `);
+    console.log("Users table ready");
+  } catch (err) {
+    console.error("Error creating users table", err);
+  } finally {
+    client.release();
+  }
+}
+
+initializeDatabase();
 
 // Middleware to check if user is authenticated
 function isAuthenticated(req, res, next) {
@@ -64,56 +70,53 @@ function isAuthenticated(req, res, next) {
 }
 
 // Middleware to check if user is admin
-function isAdmin(req, res, next) {
+async function isAdmin(req, res, next) {
   if (!req.session.userId) {
     return res.status(401).send("Unauthorized");
   }
 
-  db.get(
-    "SELECT isadmin FROM users WHERE id = ?",
-    [req.session.userId],
-    (err, user) => {
-      if (err) {
-        console.error("Database error:", err);
-        return res.status(500).send("Internal Server Error");
-      }
-      if (!user) {
-        return res.status(404).send("User not found");
-      }
-      if (user.isadmin !== 1) {
-        return res.status(403).send("Forbidden: Admin access required");
-      }
-      next();
+  try {
+    const result = await pool.query("SELECT isadmin FROM users WHERE id = $1", [
+      req.session.userId,
+    ]);
+    if (result.rows.length === 0) {
+      return res.status(404).send("User not found");
     }
-  );
+    if (!result.rows[0].isadmin) {
+      return res.status(403).send("Forbidden: Admin access required");
+    }
+    next();
+  } catch (err) {
+    console.error("Database error:", err);
+    return res.status(500).send("Internal Server Error");
+  }
 }
 
 // Serve home page
-app.get("/", (req, res) => {
-  db.get(
-    "SELECT * FROM users WHERE id = ?",
-    [req.session.userId],
-    (err, user) => {
-      if (err) {
-        console.error("Error fetching user:", err);
-        return res.status(500).send("Internal Server Error");
-      }
-      if (user) {
-        if (user.isadmin) {
-          res.render("index_loggedin_admin", { user: user });
-        } else {
-          res.render("index_loggedin", { user: user });
-        }
+app.get("/", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM users WHERE id = $1", [
+      req.session.userId,
+    ]);
+    const user = result.rows[0];
+    if (user) {
+      if (user.isadmin) {
+        res.render("index_loggedin_admin", { user: user });
       } else {
-        req.session.destroy((err) => {
-          if (err) {
-            console.error("Error destroying session:", err);
-          }
-          res.render('index');
-        });
+        res.render("index_loggedin", { user: user });
       }
+    } else {
+      req.session.destroy((err) => {
+        if (err) {
+          console.error("Error destroying session:", err);
+        }
+        res.render("index");
+      });
     }
-  );
+  } catch (err) {
+    console.error("Error fetching user:", err);
+    return res.status(500).send("Internal Server Error");
+  }
 });
 
 app.get("/roxy", (req, res) => {
@@ -132,102 +135,154 @@ app.get("/manage_users", isAuthenticated, isAdmin, (req, res) => {
   res.render("manage_users");
 });
 
+// Route to render the manage user page
+app.get('/manage-profile', isAuthenticated, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE id = $1', [req.session.userId]);
+    const user = result.rows[0];
+    res.render('manage_user', { user });
+  } catch (error) {
+    console.error('Error fetching user data:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Route to handle profile updates
+app.post('/update-profile', isAuthenticated, async (req, res) => {
+  const { firstname, lastname, email, birthday, birthdayOptIn, currentPassword, newPassword } = req.body;
+  
+  try {
+    const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [req.session.userId]);
+    const user = userResult.rows[0];
+
+    if (newPassword) {
+      const isMatch = await bcrypt.compare(currentPassword, user.password);
+      if (!isMatch) {
+        return res.status(400).json({ error: 'Current password is incorrect' });
+      }
+    }
+
+    let updateQuery = `
+      UPDATE users 
+      SET firstname = $1, lastname = $2, email = $3, birthday = $4, birthdayOptIn = $5
+    `;
+    let queryParams = [firstname, lastname, email, birthday, birthdayOptIn === 'on'];
+
+    if (newPassword) {
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      updateQuery += `, password = $${queryParams.length + 1}`;
+      queryParams.push(hashedPassword);
+    }
+
+    updateQuery += ` WHERE id = $${queryParams.length + 1}`;
+    queryParams.push(req.session.userId);
+
+    await pool.query(updateQuery, queryParams);
+
+    res.json({ message: 'Profile updated successfully' });
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET route to display the registration form
-app.get('/register', (req, res) => {
-  res.render('register');
+app.get("/register", (req, res) => {
+  res.render("register");
 });
 
 // POST route to handle form submission
-app.post('/register', async (req, res) => {
-  const { email, firstname, lastname, password, confirm_password, birthday, birthdayOptIn } = req.body;
+app.post("/register", async (req, res) => {
+  const {
+    email,
+    firstname,
+    lastname,
+    password,
+    confirm_password,
+    birthday,
+    birthdayOptIn,
+  } = req.body;
 
-  // Check if required fields are present
   if (!email || !firstname || !lastname || !password || !confirm_password) {
-    return res.render('register', { error: 'All required fields must be filled' });
+    return res.render("register", {
+      error: "All required fields must be filled",
+    });
   }
 
   if (password !== confirm_password) {
-    return res.render('register', { error: 'Passwords do not match' });
+    return res.render("register", { error: "Passwords do not match" });
   }
 
   try {
-    db.get('SELECT * FROM users WHERE email = ?', [email], async (err, user) => {
-      if (err) {
-        console.error(err);
-        return res.render('register', { error: 'An error occurred' });
-      }
-      if (user) {
-        return res.render('register', { error: 'Email already in use' });
-      }
+    const userCheck = await pool.query("SELECT * FROM users WHERE email = $1", [
+      email,
+    ]);
+    if (userCheck.rows.length > 0) {
+      return res.render("register", { error: "Email already in use" });
+    }
 
-      try {
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const stmt = db.prepare(`
-          INSERT INTO users (email, firstname, lastname, password, birthday, birthdayOptIn, isadmin)
-          VALUES (?, ?, ?, ?, ?, ?, 0)
-        `);
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const result = await pool.query(
+      `
+      INSERT INTO users (email, firstname, lastname, password, birthday, birthdayOptIn, isadmin)
+      VALUES ($1, $2, $3, $4, $5, $6, false) RETURNING id
+    `,
+      [
+        email,
+        firstname,
+        lastname,
+        hashedPassword,
+        birthday || null,
+        birthdayOptIn,
+      ]
+    );
 
-        stmt.run([
-          email, 
-          firstname, 
-          lastname, 
-          hashedPassword, 
-          birthday || null, 
-          birthdayOptIn ? 1 : 0
-        ], function(err) {
-          if (err) {
-            console.error('Error registering new user:', err);
-            return res.render('register', { error: 'Error registering user' });
-          }
-          
-          req.session.userId = this.lastID;
-          req.session.email = email;
-          res.redirect('/');
-        });
-
-        stmt.finalize();
-      } catch (hashError) {
-        console.error('Error hashing password:', hashError);
-        return res.render('register', { error: 'Error processing password' });
-      }
-    });
+    req.session.userId = result.rows[0].id;
+    req.session.email = email;
+    res.redirect("/");
   } catch (error) {
-    console.error('Error in registration process:', error);
-    res.render('register', { error: 'An error occurred during registration' });
+    console.error("Error in registration process:", error);
+    res.render("register", { error: "An error occurred during registration" });
   }
 });
 
 // User login
-app.post("/login", (req, res) => {
+app.post("/login", async (req, res) => {
   const { email, password } = req.body;
   console.log("Login attempt:", email);
 
-  db.get("SELECT * FROM users WHERE email = ?", [email], async (err, user) => {
-    if (err) {
-      console.error("Database error:", err);
-      return res.status(500).json({ success: false, error: "Error accessing database" });
-    }
-    if (!user) {
+  try {
+    const result = await pool.query("SELECT * FROM users WHERE email = $1", [
+      email,
+    ]);
+
+    if (result.rows.length === 0) {
       console.log("User not found:", email);
-      return res.status(400).json({ success: false, error: "Invalid credentials" });
+      return res
+        .status(400)
+        .json({ success: false, error: "Invalid credentials" });
     }
-    try {
-      const isMatch = await bcrypt.compare(password, user.password);
-      console.log("Password match:", isMatch);
-      if (isMatch) {
-        req.session.userId = user.id;
-        req.session.email = user.email;
-        console.log("Login successful:", email);
-        return res.json({ success: true, user: user });
-      } else {
-        console.log("Password mismatch:", email);
-        return res.status(400).json({ success: false, error: "Invalid credentials" });
-      }
-    } catch (error) {
-      console.error("Login error:", error);
-      return res.status(500).json({ success: false, error: "Error logging in" });
+
+    const user = result.rows[0];
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    console.log("Password match:", isMatch);
+
+    if (isMatch) {
+      req.session.userId = user.id;
+      req.session.email = user.email;
+      console.log("Login successful:", email);
+      return res.json({ success: true, user: user });
+    } else {
+      console.log("Password mismatch:", email);
+      return res
+        .status(400)
+        .json({ success: false, error: "Invalid credentials" });
     }
-  });
+  } catch (error) {
+    console.error("Login error:", error);
+    return res.status(500).json({ success: false, error: "Error logging in" });
+  }
 });
 
 // Logout
@@ -235,47 +290,56 @@ app.post("/logout", (req, res) => {
   req.session.destroy((err) => {
     if (err) {
       console.error("Error destroying session:", err);
-      return res.status(500).json({ success: false, error: "Error logging out" });
+      return res
+        .status(500)
+        .json({ success: false, error: "Error logging out" });
     }
     res.json({ success: true });
   });
 });
 
 // GET /birthdays - Get all users who have opted in to share their birthday
-app.get("/get_birthdays", (req, res) => {
-  db.all(
-    "SELECT id, firstname, birthday FROM users WHERE birthdayOptIn = 1",
-    (err, users) => {
-      if (err) {
-        console.error("Error fetching birthdays:", err);
-        return res.status(500).send("Internal Server Error");
-      }
-      const birthdays = users.map(user => {
-        const { id, firstname, birthday } = user;
-        return { id, name: firstname, bday: birthday };
-      });
-      res.json(birthdays);
-    }
-  );
+app.get("/get_birthdays", async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT id, firstname, birthday FROM users WHERE birthdayOptIn = true"
+    );
+    const birthdays = result.rows.map((user) => ({
+      id: user.id,
+      name: user.firstname,
+      bday: user.birthday,
+    }));
+    res.json(birthdays);
+  } catch (err) {
+    console.error("Error fetching birthdays:", err);
+    res.status(500).send("Internal Server Error");
+  }
 });
 
 // Get all users
-app.get("/users", isAuthenticated, isAdmin, (req, res) => {
-  db.all(
-    "SELECT id, email, firstname, lastname, birthday, birthdayOptIn, isadmin FROM users",
-    (err, users) => {
-      if (err) {
-        console.error("Error fetching users:", err);
-        return res.status(500).send("Internal Server Error");
-      }
-      res.json(users);
-    }
-  );
+app.get("/users", isAuthenticated, isAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT id, email, firstname, lastname, birthday, birthdayOptIn, isadmin FROM users"
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Error fetching users:", err);
+    res.status(500).send("Internal Server Error");
+  }
 });
 
 // POST /users - Add a new user
 app.post("/users", isAuthenticated, isAdmin, async (req, res) => {
-  const { email, firstname, lastname, birthday, birthdayOptIn, isadmin, password } = req.body;
+  const {
+    email,
+    firstname,
+    lastname,
+    birthday,
+    birthdayOptIn,
+    isadmin,
+    password,
+  } = req.body;
 
   if (!email || !firstname || !lastname || !password) {
     return res.status(400).send("Missing required fields");
@@ -283,84 +347,101 @@ app.post("/users", isAuthenticated, isAdmin, async (req, res) => {
 
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
-    const stmt = db.prepare(`
+    const result = await pool.query(
+      `
       INSERT INTO users (email, firstname, lastname, birthday, birthdayOptIn, isadmin, password)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    stmt.run(
-      [email, firstname, lastname, birthday, birthdayOptIn ? 1 : 0, isadmin ? 1 : 0, hashedPassword],
-      function (err) {
-        if (err) {
-          console.error("Error adding new user:", err);
-          return res.status(500).send("Error adding new user");
-        }
-        res.status(201).json({ id: this.lastID, message: "User added successfully" });
-      }
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING id
+    `,
+      [
+        email,
+        firstname,
+        lastname,
+        birthday,
+        birthdayOptIn,
+        isadmin,
+        hashedPassword,
+      ]
     );
 
-    stmt.finalize();
+    res.status(201).json({
+      id: result.rows[0].id,
+      message: "User added successfully",
+    });
   } catch (error) {
-    console.error("Error hashing password:", error);
-    res.status(500).send("Internal Server Error");
+    console.error("Error adding new user:", error);
+    res.status(500).send("Error adding new user");
   }
 });
 
 // PUT /users/:id - Update an existing user
 app.put("/users/:id", isAuthenticated, isAdmin, async (req, res) => {
   const userId = req.params.id;
-  const { email, firstname, lastname, birthday, birthdayOptIn, isadmin, password } = req.body;
+  const {
+    email,
+    firstname,
+    lastname,
+    birthday,
+    birthdayOptIn,
+    isadmin,
+    password,
+  } = req.body;
 
   if (!email || !firstname || !lastname) {
     return res.status(400).send("Missing required fields");
   }
 
   try {
-    let updateFields = [email, firstname, lastname, birthday, birthdayOptIn ? 1 : 0, isadmin ? 1 : 0];
+    let updateFields = [
+      email,
+      firstname,
+      lastname,
+      birthday,
+      birthdayOptIn,
+      isadmin,
+      userId,
+    ];
     let sql = `
       UPDATE users 
-      SET email = ?, firstname = ?, lastname = ?, birthday = ?, birthdayOptIn = ?, isadmin = ?
+      SET email = $1, firstname = $2, lastname = $3, birthday = $4, birthdayOptIn = $5, isadmin = $6
     `;
 
     if (password) {
       const hashedPassword = await bcrypt.hash(password, 10);
-      updateFields.push(hashedPassword);
-      sql += `, password = ?`;
+      updateFields.splice(6, 0, hashedPassword);
+      sql += `, password = $7 WHERE id = $8`;
+    } else {
+      sql += ` WHERE id = $7`;
     }
 
-    sql += ` WHERE id = ?`;
-    updateFields.push(userId);
+    const result = await pool.query(sql, updateFields);
 
-    db.run(sql, updateFields, function (err) {
-      if (err) {
-        console.error("Error updating user:", err);
-        return res.status(500).send("Error updating user");
-      }
-      if (this.changes === 0) {
-        return res.status(404).send("User not found");
-      }
-      res.json({ message: "User updated successfully" });
-    });
+    if (result.rowCount === 0) {
+      return res.status(404).send("User not found");
+    }
+    res.json({ message: "User updated successfully" });
   } catch (error) {
     console.error("Error updating user:", error);
-    res.status(500).send("Internal Server Error");
+    res.status(500).send("Error updating user");
   }
 });
 
 // DELETE /users/:id - Delete a user
-app.delete("/users/:id", isAuthenticated, isAdmin, (req, res) => {
+app.delete("/users/:id", isAuthenticated, isAdmin, async (req, res) => {
   const userId = req.params.id;
 
-  db.run("DELETE FROM users WHERE id = ?", userId, function (err) {
-    if (err) {
-      console.error("Error deleting user:", err);
-      return res.status(500).send("Error deleting user");
-    }
-    if (this.changes === 0) {
+  try {
+    const result = await pool.query("DELETE FROM users WHERE id = $1", [
+      userId,
+    ]);
+    if (result.rowCount === 0) {
       return res.status(404).send("User not found");
     }
     res.json({ message: "User deleted successfully" });
-  });
+  } catch (err) {
+    console.error("Error deleting user:", err);
+    res.status(500).send("Error deleting user");
+  }
 });
 
 // 404 handler
@@ -372,13 +453,20 @@ app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });
 
-// Close the database connection when the server is shut down
-process.on("SIGINT", () => {
-  db.close((err) => {
-    if (err) {
-      console.error(err.message);
-    }
+// Define a route to download the database file
+app.get('/download-users-db', (req, res) => {
+  const file = path.join(__dirname, './users.db');
+  res.download(file); // Set the path to your database file
+});
+
+// Graceful shutdown
+process.on("SIGINT", async () => {
+  try {
+    await pool.end();
     console.log("Closed the database connection.");
     process.exit(0);
-  });
+  } catch (err) {
+    console.error("Error closing database connection:", err);
+    process.exit(1);
+  }
 });

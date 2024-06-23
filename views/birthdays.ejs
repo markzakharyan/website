@@ -168,10 +168,22 @@
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const birthdayThisYear = new Date(today.getFullYear(), birthday.getMonth(), birthday.getDate());
-      const daysSinceLastBirthday = Math.ceil((today - birthdayThisYear) / (1000 * 60 * 60 * 24));
+      let birthdayThisYear = new Date(today.getFullYear(), birthday.getMonth(), birthday.getDate());
+
+      // Fix: Check if birthday this year has already passed
+      if (birthdayThisYear > today) {
+        birthdayThisYear.setFullYear(birthdayThisYear.getFullYear() - 1);
+      }
+      let daysSinceLastBirthday = Math.ceil((today - birthdayThisYear) / (1000 * 60 * 60 * 24));
+
+
+
+      console.log(`${person.name}'s birthday:`, birthday);
+      console.log('Days since last birthday:', daysSinceLastBirthday);
 
       const currentFraction = getCurrentFraction(daysSinceLastBirthday);
+      console.log('Current fraction:', currentFraction);
+
       let message = '';
 
       if (currentFraction) {
@@ -184,6 +196,7 @@
       } else {
         const { fraction: nextFraction, days: nextFractionDays } = getNextFraction(daysSinceLastBirthday);
         const daysUntilNextFraction = Math.floor(nextFractionDays - daysSinceLastBirthday);
+        console.log('Next fraction:', nextFraction, 'in', daysUntilNextFraction, 'days');
         if (nextFraction === '1/1') {
           message = `'s next birthday is in ${daysUntilNextFraction} days 🎉`;
         } else {
@@ -270,10 +283,6 @@
         updateMessage();
       })
       .catch(error => console.error('Error fetching birthdays:', error));
-
-
-    updateMessage();
-    updateDropdown();
 
     setInterval(() => {
       const now = new Date();

@@ -123,7 +123,7 @@
           <td>${user.firstname}</td>
           <td>${user.lastname}</td>
           <td>${user.birthday || 'N/A'}</td>
-          <td>${user.birthdayOptIn ? 'Yes' : 'No'}</td>
+          <td>${user.birthdayoptin ? 'Yes' : 'No'}</td>
           <td>${user.isadmin ? 'Yes' : 'No'}</td>
           <td>
             <button onclick="editUser(${user.id})">Edit</button>
@@ -184,8 +184,8 @@
         document.getElementById('firstname').value = user.firstname;
         document.getElementById('lastname').value = user.lastname;
         document.getElementById('birthday').value = user.birthday || '';
-        document.getElementById('birthdayOptIn').checked = user.birthdayOptIn === 1;
-        document.getElementById('isadmin').checked = user.isadmin === 1;
+        document.getElementById('birthdayOptIn').checked = user.birthdayoptin;
+        document.getElementById('isadmin').checked = user.isadmin;
         document.getElementById('password').value = '';
         submitBtn.textContent = 'Update User';
       }
