@@ -53,8 +53,9 @@ app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
 // Set up the database connection pool
+console.log("database running at " + (app.get("env") === "production" ? process.env.DATABASE_PRIVATE_URL : process.env.DATABASE_URL));
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: app.get("env") === "production" ? process.env.DATABASE_PRIVATE_URL : process.env.DATABASE_URL,
   ssl:
     process.env.NODE_ENV === "production"
       ? { rejectUnauthorized: false }
