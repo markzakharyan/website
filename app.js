@@ -498,12 +498,6 @@ app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });
 
-// Define a route to download the database file
-app.get("/download-users-db", (req, res) => {
-  const file = path.join(__dirname, "./users.db");
-  res.download(file); // Set the path to your database file
-});
-
 // Graceful shutdown
 process.on("SIGINT", async () => {
   try {

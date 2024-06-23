@@ -24,7 +24,8 @@
       margin-top: 20px;
     }
 
-    th, td {
+    th,
+    td {
       border: 1px solid #ddd;
       padding: 8px;
       text-align: left;
@@ -34,7 +35,10 @@
       background-color: #f2f2f2;
     }
 
-    input[type="text"], input[type="email"], input[type="password"], input[type="date"] {
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="date"] {
       width: 100%;
       padding: 5px;
       margin: 2px 0;
@@ -68,7 +72,7 @@
       <input type="date" id="birthday" placeholder="Birthday">
       <label><input type="checkbox" id="birthdayOptIn"> Birthday Opt-In</label>
       <label><input type="checkbox" id="isadmin"> Is Admin</label>
-      <input type="password" id="password" placeholder="Password">
+      <input type="password" id="password" placeholder="Password (keep empty to not modify)">
       <button type="submit" id="submit-btn">Add User</button>
       <button type="button" id="clear-btn">Clear Form</button>
     </form>
@@ -136,15 +140,21 @@
     async function handleFormSubmit(e) {
       e.preventDefault();
       const userId = document.getElementById('user-id').value;
+      const passwordInput = document.getElementById('password');
+
       const user = {
         email: document.getElementById('email').value,
         firstname: document.getElementById('firstname').value,
         lastname: document.getElementById('lastname').value,
         birthday: document.getElementById('birthday').value || null,
         birthdayOptIn: document.getElementById('birthdayOptIn').checked ? 1 : 0,
-        isadmin: document.getElementById('isadmin').checked ? 1 : 0,
-        password: document.getElementById('password').value
+        isadmin: document.getElementById('isadmin').checked ? 1 : 0
       };
+
+      // Only include password if it's been changed
+      if (passwordInput.value.trim() !== '') {
+        user.password = passwordInput.value;
+      }
 
       try {
         let response;
@@ -155,6 +165,8 @@
             body: JSON.stringify(user)
           });
         } else {
+          // For new users, always include the password
+          user.password = passwordInput.value;
           response = await fetch('/users', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
