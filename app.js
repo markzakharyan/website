@@ -11,15 +11,42 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static("public"));
 
+let sessionSecret;
+const sessionSecretString = process.env.SESSION_SECRET;
+
+if (sessionSecretString) {
+  try {
+    // Remove the single quotes around the array elements and replace them with double quotes
+    const jsonString = sessionSecretString.replace(/'/g, '"');
+
+    // Parse the JSON string into an array
+    sessionSecret = JSON.parse(jsonString);
+
+    // Validate that we got an array
+    if (!Array.isArray(sessionSecret)) {
+      throw new Error("Parsed result is not an array");
+    }
+  } catch (error) {
+    console.error("Error parsing SESSION_SECRET:", error);
+    // Fallback to using the string as-is if parsing fails
+  }
+}
+
+
+var sess = {
+  secret: sessionSecret || "your_secret_key",
+  resave: false,
+  saveUninitialized: false,
+  cookie: {},
+};
+
+if (app.get("env") === "production") {
+  app.set("trust proxy", 1); // trust first proxy
+  sess.cookie.secure = true; // serve secure cookies
+}
+
 // Set up session middleware
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || "your_secret_key",
-    resave: false,
-    saveUninitialized: false,
-    cookie: { secure: false },
-  })
-);
+app.use(session(sess));
 
 // Set EJS as the view engine
 app.set("view engine", "ejs");
@@ -136,29 +163,41 @@ app.get("/manage_users", isAuthenticated, isAdmin, (req, res) => {
 });
 
 // Route to render the manage user page
-app.get('/manage-profile', isAuthenticated, async (req, res) => {
+app.get("/manage-profile", isAuthenticated, async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM users WHERE id = $1', [req.session.userId]);
+    const result = await pool.query("SELECT * FROM users WHERE id = $1", [
+      req.session.userId,
+    ]);
     const user = result.rows[0];
-    res.render('manage_user', { user });
+    res.render("manage_user", { user });
   } catch (error) {
-    console.error('Error fetching user data:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error("Error fetching user data:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
 // Route to handle profile updates
-app.post('/update-profile', isAuthenticated, async (req, res) => {
-  const { firstname, lastname, email, birthday, birthdayOptIn, currentPassword, newPassword } = req.body;
-  
+app.post("/update-profile", isAuthenticated, async (req, res) => {
+  const {
+    firstname,
+    lastname,
+    email,
+    birthday,
+    birthdayOptIn,
+    currentPassword,
+    newPassword,
+  } = req.body;
+
   try {
-    const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [req.session.userId]);
+    const userResult = await pool.query("SELECT * FROM users WHERE id = $1", [
+      req.session.userId,
+    ]);
     const user = userResult.rows[0];
 
     if (newPassword) {
       const isMatch = await bcrypt.compare(currentPassword, user.password);
       if (!isMatch) {
-        return res.status(400).json({ error: 'Current password is incorrect' });
+        return res.status(400).json({ error: "Current password is incorrect" });
       }
     }
 
@@ -166,7 +205,13 @@ app.post('/update-profile', isAuthenticated, async (req, res) => {
       UPDATE users 
       SET firstname = $1, lastname = $2, email = $3, birthday = $4, birthdayOptIn = $5
     `;
-    let queryParams = [firstname, lastname, email, birthday, birthdayOptIn === 'on'];
+    let queryParams = [
+      firstname,
+      lastname,
+      email,
+      birthday,
+      birthdayOptIn === "on",
+    ];
 
     if (newPassword) {
       const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -179,10 +224,10 @@ app.post('/update-profile', isAuthenticated, async (req, res) => {
 
     await pool.query(updateQuery, queryParams);
 
-    res.json({ message: 'Profile updated successfully' });
+    res.json({ message: "Profile updated successfully" });
   } catch (error) {
-    console.error('Error updating profile:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error("Error updating profile:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
@@ -454,8 +499,8 @@ app.listen(port, () => {
 });
 
 // Define a route to download the database file
-app.get('/download-users-db', (req, res) => {
-  const file = path.join(__dirname, './users.db');
+app.get("/download-users-db", (req, res) => {
+  const file = path.join(__dirname, "./users.db");
   res.download(file); // Set the path to your database file
 });
 
