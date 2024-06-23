@@ -11,7 +11,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static("public"));
 
-const isProduction = process.env.NODE_ENV === 'production';
+// const isProduction = process.env.NODE_ENV === 'production';
 
 
 // Set up session middleware
@@ -19,7 +19,7 @@ app.use(session({
   secret: 'your_secret_key', // Replace with a real secret key
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: isProduction } // Set to true if using https
+  cookie: { secure: false } // Set to true if using https
 }));
 
 // Set EJS as the view engine
