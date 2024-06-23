@@ -64,7 +64,7 @@
     }
 
     .name-select::before {
-      content: 'select';
+      content: 'select & scroll';
       position: absolute;
       bottom: -15px;
       font-size: 10px;
@@ -83,6 +83,9 @@
       top: 100%;
       z-index: 1;
       width: max-content;
+      max-height: 400px; /* Adjust this value as needed */
+      overflow-y: auto;
+      padding-bottom: 5px;
     }
 
     .dropdown div {
