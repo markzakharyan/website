@@ -23,6 +23,14 @@
                 padding: 10px;
             }
         }
+
+        .error {
+            color: #d32f2f;
+        }
+
+        .success {
+            color: #388e3c;
+        }
     </style>
 </head>
 
@@ -30,7 +38,8 @@
     <div class="container">
         <h1>Mark Zakharyan</h1>
         <h2>My website</h2>
-        <p>I use this domain to host various things. The lack of a sexy aesthetic IS the aesthetic. I'm a minimalist (lazy). For now, an account lets you add your name to the birthday list. More features to come!</p>
+        <p>I use this domain to host various things. The lack of a sexy aesthetic IS the aesthetic. I'm a minimalist
+            (lazy). For now, an account lets you add your name to the birthday list. More features to come!</p>
         <h3>You should check out <a href="/birthdays">the birthday list!</a></h3>
         <br>
         <p>Maybe you meant:</p>
@@ -41,6 +50,11 @@
         </ul>
         <br>
         <div id="sign-in-area">
+            <% if (typeof success !== 'undefined' && success) { %>
+                <div class="success">
+                  <%= success %>
+                </div>
+            <% } %>
             <p>Sign in:</p>
             <form id="sign-in-form">
                 <input type="email" id="email" placeholder="Email" style="margin-right: 5px;" autocomplete="off">
@@ -48,12 +62,13 @@
                     autocomplete="off">
                 <button type="submit">Sign in</button>
             </form>
+            <p><a href="/reset-password">Forgot Password?</a></p>
             <p><a href="/register">Register</a></p>
             <p id="error-msg" style="color: red;"></p>
         </div>
     </div>
     <script>
-        document.getElementById('sign-in-form').addEventListener('submit', function(event) {
+        document.getElementById('sign-in-form').addEventListener('submit', function (event) {
             event.preventDefault();
             login();
         });

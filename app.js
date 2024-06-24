@@ -3,6 +3,8 @@ const bcrypt = require("bcrypt");
 const path = require("path");
 const { Pool } = require("pg");
 const session = require("express-session");
+const nodemailer = require("nodemailer");
+const crypto = require("crypto");
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -32,7 +34,6 @@ if (sessionSecretString) {
   }
 }
 
-
 var sess = {
   secret: sessionSecret || "your_secret_key",
   resave: false,
@@ -53,9 +54,17 @@ app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
 // Set up the database connection pool
-console.log("database running at " + (app.get("env") === "production" ? process.env.DATABASE_PRIVATE_URL : process.env.DATABASE_URL));
+console.log(
+  "database running at " +
+    (app.get("env") === "production"
+      ? process.env.DATABASE_PRIVATE_URL
+      : process.env.DATABASE_URL)
+);
 const pool = new Pool({
-  connectionString: app.get("env") === "production" ? process.env.DATABASE_PRIVATE_URL : process.env.DATABASE_URL,
+  connectionString:
+    app.get("env") === "production"
+      ? process.env.DATABASE_PRIVATE_URL
+      : process.env.DATABASE_URL,
   ssl:
     process.env.NODE_ENV === "production"
       ? { rejectUnauthorized: false }
@@ -127,18 +136,24 @@ app.get("/", async (req, res) => {
       req.session.userId,
     ]);
     const user = result.rows[0];
+
+    // Check for success message
+    const successMessage = req.session.successMessage;
+    // Clear the message from the session
+    delete req.session.successMessage;
+
     if (user) {
       if (user.isadmin) {
-        res.render("index_loggedin_admin", { user: user });
+        res.render("index_loggedin_admin", { user: user, success: successMessage });
       } else {
-        res.render("index_loggedin", { user: user });
+        res.render("index_loggedin", { user: user, success: successMessage });
       }
     } else {
       req.session.destroy((err) => {
         if (err) {
           console.error("Error destroying session:", err);
         }
-        res.render("index");
+        res.render("index", { success: successMessage });
       });
     }
   } catch (err) {
@@ -342,6 +357,135 @@ app.post("/logout", (req, res) => {
     }
     res.json({ success: true });
   });
+});
+
+// Serve reset password page
+app.get("/reset-password", (req, res) => {
+  res.render("reset_password");
+});
+
+// Handle reset password request
+app.post("/reset-password", async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const result = await pool.query("SELECT * FROM users WHERE email = $1", [
+      email,
+    ]);
+    if (result.rows.length === 0) {
+      return res.render("reset_password", {
+        error: "No account found with that email address.",
+      });
+    }
+
+    const user = result.rows[0];
+    const resetToken = crypto.randomBytes(20).toString("hex");
+    const resetTokenExpiry = Date.now() + 3600000; // 1 hour from now
+
+    await pool.query(
+      "UPDATE users SET reset_token = $1, reset_token_expiry = $2 WHERE id = $3",
+      [resetToken, resetTokenExpiry, user.id]
+    );
+
+    // Send reset password email
+    const transporter = nodemailer.createTransport({
+      host: "smtp.zoho.com",
+      port: 465,
+      secure: true,
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    const resetUrl = `http://${req.headers.host}/reset/${resetToken}`;
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: user.email,
+      subject: "Password Reset",
+      html: `
+        <p>You requested a password reset.</p>
+        <p>Click this <a href="${resetUrl}">link</a> to set a new password.</p>
+      `,
+    });
+
+    res.render("reset_password", {
+      success: "A password reset link has been sent to your email.",
+    });
+  } catch (error) {
+    console.error("Error in reset password process:", error);
+    res.render("reset_password", {
+      error: "An error occurred. Please try again later.",
+    });
+  }
+});
+
+// Serve reset password form
+app.get("/reset/:token", async (req, res) => {
+  const { token } = req.params;
+
+  try {
+    const result = await pool.query(
+      "SELECT * FROM users WHERE reset_token = $1 AND reset_token_expiry > $2",
+      [token, Date.now()]
+    );
+
+    if (result.rows.length === 0) {
+      return res.render("reset_password", {
+        error: "Invalid or expired reset token.",
+      });
+    }
+
+    res.render("reset_password_form", { token });
+  } catch (error) {
+    console.error("Error checking reset token:", error);
+    res.render("reset_password", {
+      error: "An error occurred. Please try again later.",
+    });
+  }
+});
+
+// Handle password reset
+app.post("/reset/:token", async (req, res) => {
+  const { token } = req.params;
+  const { password, confirm_password } = req.body;
+
+  if (password !== confirm_password) {
+    return res.render("reset_password_form", {
+      token,
+      error: "Passwords do not match.",
+    });
+  }
+
+  try {
+    const result = await pool.query(
+      "SELECT * FROM users WHERE reset_token = $1 AND reset_token_expiry > $2",
+      [token, Date.now()]
+    );
+
+    if (result.rows.length === 0) {
+      return res.render("reset_password", {
+        error: "Invalid or expired reset token.",
+      });
+    }
+
+    const user = result.rows[0];
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    await pool.query(
+      "UPDATE users SET password = $1, reset_token = NULL, reset_token_expiry = NULL WHERE id = $2",
+      [hashedPassword, user.id]
+    );
+
+    req.session.successMessage = "Your password has been reset successfully. You can now log in with your new password.";
+    res.redirect('/');
+
+  } catch (error) {
+    console.error("Error resetting password:", error);
+    res.render("reset_password", {
+      error: "An error occurred. Please try again later.",
+    });
+  }
 });
 
 // GET /birthdays - Get all users who have opted in to share their birthday

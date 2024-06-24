@@ -77,16 +77,23 @@
                 padding: 10px;
             }
         }
+
+        .password-mismatch {
+            border-color: #d32f2f;
+        }
+
     </style>
 </head>
 
 <body>
     <div class="container">
         <h1>Register</h1>
-        <form action="/register" method="POST">
+        <form action="/register" method="POST" id="registerForm">
             <% if (typeof error !== 'undefined') { %>
                 <p class="error"><%= error %></p>
             <% } %>
+
+            <p id="passwordMatchError" class="error" style="display: none;">Passwords do not match.</p>
             
             <label for="email">Email:</label>
             <input type="email" id="email" name="email" required>
@@ -118,6 +125,7 @@
         <p><a href="/">Back to Home</a></p>
     </div>
 
+
     <script>
         document.getElementById('birthday').addEventListener('change', function() {
             var birthdayOptInContainer = document.getElementById('birthdayOptInContainer');
@@ -128,7 +136,36 @@
                 document.getElementById('birthdayOptIn').checked = false;
             }
         });
+
+        const form = document.getElementById('registerForm');
+        const password = document.getElementById('password');
+        const confirmPassword = document.getElementById('confirm_password');
+        const passwordMatchError = document.getElementById('passwordMatchError');
+
+        function validatePasswords() {
+            if (password.value !== confirmPassword.value) {
+                password.classList.add('password-mismatch');
+                confirmPassword.classList.add('password-mismatch');
+                passwordMatchError.style.display = 'block';
+                return false;
+            } else {
+                password.classList.remove('password-mismatch');
+                confirmPassword.classList.remove('password-mismatch');
+                passwordMatchError.style.display = 'none';
+                return true;
+            }
+        }
+
+        password.addEventListener('input', validatePasswords);
+        confirmPassword.addEventListener('input', validatePasswords);
+
+        form.addEventListener('submit', function(e) {
+            if (!validatePasswords()) {
+                e.preventDefault();
+            }
+        });
     </script>
+
 </body>
 
 </html>
