@@ -1,14 +1,21 @@
 <%- contentFor('head') %>
 <title>Fourier Visualization</title>
+<style>
+    .controls label {
+      display: inline-block;
+    }
+</style>
 
 
 <%- contentFor('body') %>
 <body>
     <h3>Visualization for Phys CS 33 HW1 Problem 1</h3>
-    <div id="plot"></div>
-    <div>
-      <input type="checkbox" id="showHarmonics" checked>
-      <label for="showHarmonics">Show Harmonics</label>
+    <div class="visualization-container">
+        <div id="plot" class="plot"></div>
+        <div class="controls">
+            <input type="checkbox" id="showHarmonics" checked>
+            <label for="showHarmonics">Show Harmonics</label>
+        </div>
     </div>
 </body>
 
