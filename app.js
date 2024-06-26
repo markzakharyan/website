@@ -39,15 +39,21 @@ if (sessionSecretString) {
   }
 }
 
-app.use(session({
+var sess = {
   secret: sessionSecret || "your_secret_key",
   resave: false,
   saveUninitialized: false,
-  cookie: {
-    secure: app.get("env") === "production",
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
-  }
-}));
+  cookie: {},
+};
+
+if (app.get("env") === "production") {
+  app.set("trust proxy", 1); // trust first proxy
+  sess.cookie.secure = true; // serve secure cookies
+  maxAge: 24 * 60 * 60 * 1000 // 24 hours
+}
+
+app.use(session(sess));
+
 
 // View engine setup
 app.set("view engine", "ejs");
