@@ -104,12 +104,12 @@ router.post('/reset-password', async (req, res) => {
     const resetUrl = `http://${req.headers.host}/reset/${resetToken}`;
     await sendResetPasswordEmail(user.email, resetUrl);
 
-    res.render("reset_password", {
+    res.render("pages/reset_password", {
       success: "A password reset link has been sent to your email.",
     });
   } catch (error) {
     console.error("Error in reset password process:", error);
-    res.render("reset_password", {
+    res.render("pages/reset_password", {
       error: "An error occurred. Please try again later.",
     });
   }
@@ -138,7 +138,10 @@ router.post('/reset/:token', async (req, res) => {
       [hashedPassword, user.id]
     );
 
-    res.json({ message: "Your password has been reset successfully. You can now log in with your new password." });
+    req.session.userId = user.id;
+    req.session.successMessage = "Your password has been reset successfully. You have been automatically logged in.";
+    res.redirect('/');
+
   } catch (error) {
     console.error("Error resetting password:", error);
     res.status(500).json({ error: "An error occurred. Please try again later." });
