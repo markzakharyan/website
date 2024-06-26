@@ -1,0 +1,74 @@
+<%- contentFor('head') %>
+<title>Home</title>
+
+
+<%- contentFor('body') %>
+<h2>My website</h2>
+<p>I use this domain to host various things. The lack of a sexy aesthetic IS the aesthetic. I'm a minimalist
+    (lazy).
+    For now, an account lets you add your name to the birthday list. More features to come!</p>
+<br>
+<h3>You should check out <a href="/birthdays">the birthday list!</a></h3>
+<br>
+<p>Maybe you meant:</p>
+<div class="maybe-you-meant">
+    <ul>
+        <li><a href="/fourier">Fourier Visualization</a></li>
+        <li><a href="mailto:markzakharyan@ucsb.edu">My Email</a></li>
+        <li><a href="https://github.com/markzakharyan">My Github</a></li>
+    </ul>
+</div>
+<br>
+<div id="sign-in-area">
+    <% if (locals.success) { %>
+        <div class="success">
+            <%= success %>
+        </div>
+    <% } %>
+    <p>Sign in:</p>
+    <form id="sign-in-form">
+        <input type="email" id="email" placeholder="Email" style="margin-right: 5px;"
+            autocomplete="off">
+        <input type="password" id="password" placeholder="Password" style="margin-right: 5px;"
+            autocomplete="off">
+        <button type="submit">Sign in</button>
+    </form>
+    <p><a href="/reset-password">Forgot Password?</a></p>
+    <p><a href="/register">Register</a></p>
+    <p id="error-msg" style="color: red;"></p>
+</div>
+
+<%- contentFor('scripts') %>
+<script>
+    document.getElementById('sign-in-form').addEventListener('submit', function (event) {
+        event.preventDefault();
+        login();
+    });
+
+    function login() {
+        var email = document.getElementById('email').value;
+        var password = document.getElementById('password').value;
+
+        fetch('/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email, password }),
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.reload();
+                } else {
+                    throw new Error(data.error || 'Login failed');
+                }
+            })
+            .catch((error) => {
+                document.getElementById('error-msg').innerText = error.message;
+                setTimeout(() => {
+                    document.getElementById('error-msg').innerText = '';
+                }, 5000);
+            });
+    }
+</script>

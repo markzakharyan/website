@@ -1,0 +1,35 @@
+<%- contentFor('head') %>
+<title>Admin Panel</title>
+
+<%- contentFor('body') %>
+<div id="user-area">
+    <h2 id="welcome">Welcome, <span id="user-name"><%= user.firstname %></span>!</h2>
+    <p>You're signed in.</p>
+    <button onclick="logout()">Sign out</button>
+</div>
+<a href="/manage_users"><h3>Manage Users</h3></a>
+<a href="/manage-profile"><h3>Manage Your Profile</h3></a>
+<h3>You should check out <a href="/birthdays">the birthday list!</a></h3>
+<p>Or:</p>
+<div class="maybe-you-meant">
+    <ul>
+        <li><a href="/fourier">Fourier Visualization</a></li>
+        <li><a href="mailto:markzakharyan@ucsb.edu">My Email</a></li>
+        <li><a href="https://github.com/markzakharyan">My Github</a></li>
+    </ul>
+</div>
+
+
+
+<%- contentFor('scripts') %>
+<script>
+    function logout() {
+        fetch('/logout', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.reload();
+                }
+            });
+    }
+</script>

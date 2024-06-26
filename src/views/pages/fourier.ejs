@@ -1,0 +1,187 @@
+<%- contentFor('head') %>
+<title>Fourier Visualization</title>
+
+
+<%- contentFor('body') %>
+<body>
+    <h3>Visualization for Phys CS 33 HW1 Problem 1</h3>
+    <div id="plot"></div>
+    <div>
+      <input type="checkbox" id="showHarmonics" checked>
+      <label for="showHarmonics">Show Harmonics</label>
+    </div>
+</body>
+
+
+<%- contentFor('scripts') %>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script>
+  // Define the parameters
+  const l = 1.0;  // Length of the string (normalized to 1)
+  const h = 0.1;  // Maximum displacement at the center
+  const v = 1.0;  // Wave speed (normalized)
+  const N = 100;  // Number of points along the string
+  const T = 8.0;  // Total time (in seconds)
+  const dt = 0.003;  // Time step (in seconds)
+
+  // Create the spatial and temporal grid
+  const x = Array.from({ length: N }, (_, i) => i * l / (N - 1));
+  const t = Array.from({ length: Math.floor(T / dt) }, (_, i) => i * dt);
+
+  // Calculate for a given number of harmonics and time step
+  function calculateWaveFunction(numHarmonics, timeStep) {
+    const frequencies = Array.from({ length: numHarmonics }, (_, i) => i + 1);
+    const An = frequencies.map(n => (2 * Math.sin(n * Math.PI / 4) - Math.sin(n * Math.PI / 2)) / (n ** 2));
+
+    const y = x.map(position => {
+      let sum = 0;
+      for (let j = 0; j < frequencies.length; j++) {
+        const n = frequencies[j];
+        sum += (8 * h / Math.PI) * An[j] * Math.sin(n * Math.PI * position / l) * Math.cos(n * Math.PI * v * t[timeStep] / l);
+      }
+      return sum;
+    });
+
+    return {
+      x: x, y: y, type: 'scatter',
+      mode: 'lines',
+      name: 'Total Wave', // Naming the total wave trace
+      line: { color: 'blue', width: 3 }, // Total wave
+      hoverinfo: "none"
+    };
+  }
+
+  // Create the plot
+  const maxHarmonics = 30;
+  const initialNumHarmonics = 1;
+  const initialTimeStep = 0;
+  const initialData = calculateWaveFunction(initialNumHarmonics, initialTimeStep);
+
+  initialData.hoverinfo = "none"
+
+  let isPlaying = true;
+
+  const layout = {
+    title: 'Wave',
+    xaxis: { title: 'Position (x/l)', range: [0, 1] },
+    yaxis: { title: 'Displacement (y/h)', range: [-0.4, 0.4] },
+    updatemenus: [{
+      buttons: [
+        {
+          args: ['animate', { frame: { duration: 50, redraw: false }, fromcurrent: true, transition: { duration: 0 } }],
+          label: 'Play',
+          method: 'animate',
+          execute: true // Ensuring animation continues when Play is clicked
+        },
+        {
+          // Updated Pause button configuration to actually pause the animation
+          args: [[], { mode: "immediate" }],
+          label: 'Pause',
+          method: 'animate',
+          execute: true // Ensuring animation stops when Pause is clicked
+        }
+      ],
+      direction: 'left',
+      pad: { r: 10, t: 87 },
+      showactive: false,
+      type: 'buttons',
+      x: 0.1,
+      xanchor: 'right',
+      y: 0,
+      yanchor: 'top'
+    }],
+    sliders: [{
+      pad: { l: 130, t: 55 },
+      currentvalue: {
+        visible: true,
+        prefix: 'Total harmonics: ',
+        xanchor: 'right',
+        font: { size: 20, color: '#666' }
+      },
+      steps: Array.from({ length: maxHarmonics }, (_, i) => ({
+        label: i + 1,
+        method: 'update',
+        args: [{ x: [initialData.x], y: [initialData.y] }]
+      }))
+    }]
+  };
+
+  let currentTimeStep = initialTimeStep;
+  let currentNumHarmonics = initialNumHarmonics;
+
+  function calculateHarmonics(numHarmonics, timeStep) {
+    if (numHarmonics <= 1) {
+      return [];
+    }
+
+    const frequencies = Array.from({ length: numHarmonics }, (_, i) => i + 1);
+    const An = frequencies.map(n => (2 * Math.sin(n * Math.PI / 4) - Math.sin(n * Math.PI / 2)) / (n ** 2));
+
+    return frequencies.map(n => {
+      const y = x.map(position => {
+        return (8 * h / Math.PI) * An[n - 1] * Math.sin(n * Math.PI * position / l) * Math.cos(n * Math.PI * v * t[timeStep] / l);
+      });
+      return { x: x, y: y, type: 'scatter', mode: 'lines', name: `Harmonic ${n}`, line: { color: "rgba(255, 0, 0, 0.3)", width: 2 }, hoverinfo: "none" };
+    });
+  }
+
+  function updatePlot() {
+    if (!isPlaying) {
+      return; // Stops the update if not in play mode
+    }
+
+    // Check the state of the "Show Harmonics" checkbox
+    const showHarmonics = document.getElementById("showHarmonics").checked;
+
+    // Calculate total wave
+    const totalWaveData = calculateWaveFunction(currentNumHarmonics, currentTimeStep);
+
+    let plotData = [totalWaveData]; // Start with total wave data
+
+    // Include harmonics if checkbox is checked
+    if (showHarmonics) {
+      const harmonicsData = calculateHarmonics(currentNumHarmonics, currentTimeStep);
+      if (harmonicsData.length === 0) {
+        plotData = plotData.concat({
+          x: [-10.0],
+          y: [-10.0],
+          type: 'scatter',
+          mode: 'lines',
+          name: `Harmonic 1`,
+          line: { color: "rgba(255, 0, 0, 0.3)", width: 2, },
+          hoverinfo: "none"
+        });
+      } else {
+        plotData = plotData.concat(harmonicsData);
+      }
+    }
+
+    // Update the plot with harmonics (if included) and the total wave
+    Plotly.react('plot', plotData, layout);
+
+    currentTimeStep = (currentTimeStep + 1) % t.length;
+    if (isPlaying) {
+      requestAnimationFrame(updatePlot);
+    }
+  }
+
+  // Initialize the plot with initial data
+  Plotly.newPlot('plot', [initialData], layout, { responsive: true }).then(function (gd) {
+    updatePlot();
+    gd.on('plotly_sliderchange', function (event) {
+      currentNumHarmonics = event.slider.active + 1;
+      currentTimeStep = initialTimeStep;
+      updatePlot();
+    });
+
+    gd.on('plotly_buttonclicked', function (event) {
+      if (event.button.label === 'Pause') {
+        isPlaying = false;
+      } else if (event.button.label === 'Play') {
+        isPlaying = true;
+        requestAnimationFrame(updatePlot);
+      }
+    });
+  });
+
+</script>

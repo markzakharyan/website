@@ -1,0 +1,95 @@
+<%- contentFor('head') %>
+<title>Register</title>
+<style>
+    #birthdayOptInContainer {
+        display: none;
+        margin-top: 10px;
+    }
+
+    .password-mismatch {
+        border-color: #d32f2f;
+    }
+</style>
+
+<%- contentFor('body') %>
+<body>
+    <form action="/register" method="POST" id="registerForm">
+        <% if (typeof error !=='undefined' ) { %>
+            <p class="error">
+                <%= error %>
+            </p>
+        <% } %>
+
+        <p id="passwordMatchError" class="error" style="display: none;">Passwords do not match.</p>
+
+        <label for="email">Email:</label>
+        <input type="email" id="email" name="email" required>
+
+        <label for="firstname">First Name:</label>
+        <input type="text" id="firstname" name="firstname" required>
+
+        <label for="lastname">Last Name:</label>
+        <input type="text" id="lastname" name="lastname" required>
+
+        <label for="password">Password:</label>
+        <input type="password" id="password" name="password" required>
+
+        <label for="confirm_password">Confirm Password:</label>
+        <input type="password" id="confirm_password" name="confirm_password" required>
+
+        <label for="birthday">Birthday (optional):</label>
+        <input type="date" id="birthday" name="birthday">
+
+        <div id="birthdayOptInContainer">
+            <label>
+                <input type="checkbox" id="birthdayOptIn" name="birthdayOptIn">
+                Would you like to be added to the birthday countdown list?
+            </label>
+        </div>
+
+        <button type="submit">Register</button>
+    </form>
+    <p><a href="/">Back to Home</a></p>
+</body>
+
+
+<%- contentFor('scripts') %>
+<script>
+    document.getElementById('birthday').addEventListener('change', function () {
+        var birthdayOptInContainer = document.getElementById('birthdayOptInContainer');
+        if (this.value) {
+            birthdayOptInContainer.style.display = 'block';
+        } else {
+            birthdayOptInContainer.style.display = 'none';
+            document.getElementById('birthdayOptIn').checked = false;
+        }
+    });
+
+    const form = document.getElementById('registerForm');
+    const password = document.getElementById('password');
+    const confirmPassword = document.getElementById('confirm_password');
+    const passwordMatchError = document.getElementById('passwordMatchError');
+
+    function validatePasswords() {
+        if (password.value !== confirmPassword.value) {
+            password.classList.add('password-mismatch');
+            confirmPassword.classList.add('password-mismatch');
+            passwordMatchError.style.display = 'block';
+            return false;
+        } else {
+            password.classList.remove('password-mismatch');
+            confirmPassword.classList.remove('password-mismatch');
+            passwordMatchError.style.display = 'none';
+            return true;
+        }
+    }
+
+    password.addEventListener('input', validatePasswords);
+    confirmPassword.addEventListener('input', validatePasswords);
+
+    form.addEventListener('submit', function (e) {
+        if (!validatePasswords()) {
+            e.preventDefault();
+        }
+    });
+</script>

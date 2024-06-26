@@ -1,0 +1,27 @@
+<header>
+    <h1 class="pagetitle">Mark Zakharyan</h1>
+    <nav>
+        <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="/birthdays">Birthdays</a></li>
+            <li><a href="/fourier">Fourier Visualization</a></li>
+            <% if (locals.user && user.isadmin) { %>
+                <li><a href="/manage_users">Manage Users</a></li>
+            <% } %>
+            <% if (locals.user) { %>
+                <li><a href="/manage-profile">Manage Profile</a></li>
+                <li><a href="#" onclick="logout()">Logout</a></li>
+            <% } else { %>
+                <li><a href="/login">Login</a></li>
+                <li><a href="/register">Register</a></li>
+            <% } %>
+        </ul>
+    </nav>
+    <script>
+        window.onload = function () {
+            if (document.title)
+                document.querySelector("h1").textContent = `${document.title} | Mark Zakharyan`;
+        }
+    </script>
+    <hr>
+</header>

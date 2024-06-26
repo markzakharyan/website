@@ -1,0 +1,171 @@
+<%- contentFor('head') %>
+<title>Manage Users</title>
+
+<%- contentFor('body') %>
+<body>
+  <form id="user-form">
+    <input type="hidden" id="user-id">
+    <input type="email" id="email" placeholder="Email" required>
+    <input type="text" id="firstname" placeholder="First Name" required>
+    <input type="text" id="lastname" placeholder="Last Name" required>
+    <input type="date" id="birthday" placeholder="Birthday">
+    <label><input type="checkbox" id="birthdayOptIn"> Birthday Opt-In</label>
+    <label><input type="checkbox" id="isadmin"> Is Admin</label>
+    <input type="password" id="password" placeholder="Password (keep empty to not modify)">
+    <button type="submit" id="submit-btn">Add User</button>
+    <button type="button" id="clear-btn">Clear Form</button>
+  </form>
+  <p id="error-msg" class="error-msg"></p>
+  <table id="users-table">
+    <thead>
+      <tr>
+        <th>Email</th>
+        <th>First Name</th>
+        <th>Last Name</th>
+        <th>Birthday</th>
+        <th>Birthday Opt-In</th>
+        <th>Is Admin</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</body>
+
+
+<%- contentFor('scripts') %>
+<script>
+  const userForm = document.getElementById('user-form');
+  const submitBtn = document.getElementById('submit-btn');
+  const clearBtn = document.getElementById('clear-btn');
+  const errorMsg = document.getElementById('error-msg');
+  const usersTable = document.getElementById('users-table').getElementsByTagName('tbody')[0];
+
+  let users = [];
+
+  // Fetch users on page load
+  fetchUsers();
+
+  userForm.addEventListener('submit', handleFormSubmit);
+  clearBtn.addEventListener('click', clearForm);
+
+  async function fetchUsers() {
+    try {
+      const response = await fetch('/users');
+      users = await response.json();
+      renderUsersTable();
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      errorMsg.textContent = 'Failed to fetch users';
+    }
+  }
+
+  function renderUsersTable() {
+    usersTable.innerHTML = '';
+    users.forEach(user => {
+      const row = usersTable.insertRow();
+      row.innerHTML = `
+        <td>${user.email}</td>
+        <td>${user.firstname}</td>
+        <td>${user.lastname}</td>
+        <td>${user.birthday || 'N/A'}</td>
+        <td>${user.birthdayoptin ? 'Yes' : 'No'}</td>
+        <td>${user.isadmin ? 'Yes' : 'No'}</td>
+        <td>
+          <button onclick="editUser(${user.id})">Edit</button>
+          <button onclick="deleteUser(${user.id})">Delete</button>
+        </td>
+      `;
+    });
+  }
+
+  async function handleFormSubmit(e) {
+    e.preventDefault();
+    const userId = document.getElementById('user-id').value;
+    const passwordInput = document.getElementById('password');
+
+    const user = {
+      email: document.getElementById('email').value,
+      firstname: document.getElementById('firstname').value,
+      lastname: document.getElementById('lastname').value,
+      birthday: document.getElementById('birthday').value || null,
+      birthdayOptIn: document.getElementById('birthdayOptIn').checked ? 1 : 0,
+      isadmin: document.getElementById('isadmin').checked ? 1 : 0
+    };
+
+    // Only include password if it's been changed
+    if (passwordInput.value.trim() !== '') {
+      user.password = passwordInput.value;
+    }
+
+    try {
+      let response;
+      if (userId) {
+        response = await fetch(`/users/${userId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(user)
+        });
+      } else {
+        // For new users, always include the password
+        user.password = passwordInput.value;
+        response = await fetch('/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(user)
+        });
+      }
+
+      const result = await response.json();
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      clearForm();
+      fetchUsers();
+      errorMsg.textContent = userId ? 'User updated successfully' : 'User added successfully';
+    } catch (error) {
+      console.error('Error:', error);
+      errorMsg.textContent = error.message;
+    }
+  }
+
+  function editUser(id) {
+    const user = users.find(u => u.id === id);
+    if (user) {
+      document.getElementById('user-id').value = user.id;
+      document.getElementById('email').value = user.email;
+      document.getElementById('firstname').value = user.firstname;
+      document.getElementById('lastname').value = user.lastname;
+      document.getElementById('birthday').value = user.birthday || '';
+      document.getElementById('birthdayOptIn').checked = user.birthdayoptin;
+      document.getElementById('isadmin').checked = user.isadmin;
+      document.getElementById('password').value = '';
+      submitBtn.textContent = 'Update User';
+    }
+  }
+
+  async function deleteUser(id) {
+    if (confirm('Are you sure you want to delete this user?')) {
+      try {
+        const response = await fetch(`/users/${id}`, { method: 'DELETE' });
+        const result = await response.json();
+        if (result.error) {
+          throw new Error(result.error);
+        }
+        fetchUsers();
+        errorMsg.textContent = 'User deleted successfully';
+      } catch (error) {
+        console.error('Error:', error);
+        errorMsg.textContent = error.message;
+      }
+    }
+  }
+
+  function clearForm() {
+    userForm.reset();
+    document.getElementById('user-id').value = '';
+    submitBtn.textContent = 'Add User';
+    errorMsg.textContent = '';
+  }
+</script>
