@@ -13,11 +13,11 @@ function isAuthenticated(req, res, next) {
   }
 }
 
-function isKayla(req, res, next) {
+async function isKayla(req, res, next) {
   if (req.session.email === process.env.KAYLA_EMAIL) {
     next();
   } else {
-    res.status(403).json({ error: 'Forbidden' });
+    isAdmin(req, res, next);
   }
 }
 
@@ -32,7 +32,7 @@ async function isAdmin(req, res, next) {
       return res.status(404).json({ error: 'User not found' });
     }
     if (!result.rows[0].isadmin) {
-      return res.status(403).json({ error: 'Forbidden: Admin access required' });
+      return res.status(403).json({ error: 'Forbidden' });
     }
     next();
   } catch (err) {
