@@ -13,6 +13,14 @@ function isAuthenticated(req, res, next) {
   }
 }
 
+function isKayla(req, res, next) {
+  if (req.session.email === process.env.KAYLA_EMAIL) {
+    next();
+  } else {
+    res.status(403).json({ error: 'Forbidden' });
+  }
+}
+
 async function isAdmin(req, res, next) {
   if (!req.session.userId) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -33,4 +41,4 @@ async function isAdmin(req, res, next) {
   }
 }
 
-module.exports = { isAuthenticated, isAdmin };
+module.exports = { isAuthenticated, isAdmin, isKayla };

@@ -1,6 +1,6 @@
 const express = require('express');
 const { Pool } = require('pg');
-const { isAuthenticated, isAdmin } = require('../middleware/auth');
+const { isAuthenticated, isAdmin, isKayla } = require('../middleware/auth');
 const { get } = require('./auth');
 const router = express.Router();
 
@@ -17,7 +17,11 @@ router.get('/', async (req, res) => {
       if (user.isadmin) {
         res.render('pages/index_loggedin_admin', { user: user, success: req.session.successMessage });
       } else {
-        res.render('pages/index_loggedin', { user: user, success: req.session.successMessage });
+        if (user.email === process.env.KAYLA_EMAIL) {
+          res.render('pages/index_kayla', { user: user, success: req.session.successMessage });
+        } else {
+          res.render('pages/index_loggedin', { user: user, success: req.session.successMessage });
+        }
       }
       delete req.session.successMessage;
     } else {
@@ -72,6 +76,11 @@ router.get('/manage-profile', isAuthenticated, async (req, res) => {
 router.get('/register', (req, res) => {
   res.render('pages/register');
 });
+
+router.get('/kayla', isKayla, (req, res) => {
+  res.render('pages/kayla');
+});
+
 
 // Reset password page
 router.get('/reset-password', (req, res) => {
