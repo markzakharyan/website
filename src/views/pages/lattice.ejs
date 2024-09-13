@@ -1,0 +1,254 @@
+<%- contentFor('head') %>
+  <meta charset="UTF-8">
+  <title>Coupled Oscillators Simulation</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+    }
+
+    .content-wrapper {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .canvas-container {
+      width: 100%;
+      height: 0;
+      padding-bottom: 66.67%;
+      /* 2:3 aspect ratio */
+      position: relative;
+      overflow: hidden;
+    }
+
+    #canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+
+
+  <%- contentFor('body') %>
+    <div class="content-wrapper">
+      <h3>Drag points around</h3>
+      <div class="canvas-container">
+        <canvas id="canvas"></canvas>
+      </div>
+    </div>
+
+    <%- contentFor('scripts') %>
+      <script>
+        // Get the canvas and context
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Grid settings
+        const gridCols = 15;
+        const gridRows = 10;
+        let oscillatorSpacingX, oscillatorSpacingY;
+
+        // Oscillator settings
+        const k = 200; // Spring constant
+        const damping = 0.95; // Damping factor
+        const mass = 1; // Mass of the oscillator
+
+        // Initialize oscillators
+        const oscillators = [];
+        function resizeCanvas() {
+          // Set canvas size to 90% of the viewport width and height
+          canvas.width = window.innerWidth;
+          canvas.height = window.innerHeight;
+
+          // Calculate spacing with some padding
+          oscillatorSpacingX = (canvas.width - 40) / (gridCols - 1);
+          oscillatorSpacingY = (canvas.height - 40) / (gridRows - 1);
+
+          initOscillators();
+        }
+
+        function initOscillators() {
+          oscillators.length = 0;
+          for (let i = 0; i < gridRows; i++) {
+            oscillators[i] = [];
+            for (let j = 0; j < gridCols; j++) {
+              const x0 = 20 + j * oscillatorSpacingX;
+              const y0 = 20 + i * oscillatorSpacingY;
+              oscillators[i][j] = {
+                x0: x0,
+                y0: y0,
+                x: x0,
+                y: y0,
+                vx: 0,
+                vy: 0,
+                ax: 0,
+                ay: 0,
+                isDragging: false
+              };
+            }
+          }
+        }
+
+        // Physics update
+        function updatePhysics(dt) {
+          // First pass: compute accelerations
+          for (let i = 0; i < gridRows; i++) {
+            for (let j = 0; j < gridCols; j++) {
+              const osc = oscillators[i][j];
+
+              if (osc.isDragging) continue;
+
+              let forceX = -k * (osc.x - osc.x0);
+              let forceY = -k * (osc.y - osc.y0);
+
+              const neighbors = [];
+
+              if (i > 0) neighbors.push(oscillators[i - 1][j]);
+              if (i < gridRows - 1) neighbors.push(oscillators[i + 1][j]);
+              if (j > 0) neighbors.push(oscillators[i][j - 1]);
+              if (j < gridCols - 1) neighbors.push(oscillators[i][j + 1]);
+
+              neighbors.forEach(neighbor => {
+                forceX += -k * (osc.x - neighbor.x);
+                forceY += -k * (osc.y - neighbor.y);
+              });
+
+              osc.ax = forceX / mass;
+              osc.ay = forceY / mass;
+            }
+          }
+
+          // Second pass: update velocities and positions
+          for (let i = 0; i < gridRows; i++) {
+            for (let j = 0; j < gridCols; j++) {
+              const osc = oscillators[i][j];
+
+              if (osc.isDragging) continue;
+
+              osc.vx += osc.ax * dt;
+              osc.vy += osc.ay * dt;
+
+              osc.vx *= damping;
+              osc.vy *= damping;
+
+              osc.x += osc.vx * dt;
+              osc.y += osc.vy * dt;
+            }
+          }
+        }
+
+        // Drawing function
+        function draw() {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          // Draw connections
+          ctx.strokeStyle = '#cccccc';
+          for (let i = 0; i < gridRows; i++) {
+            for (let j = 0; j < gridCols; j++) {
+              const osc = oscillators[i][j];
+
+              if (i < gridRows - 1) {
+                const neighbor = oscillators[i + 1][j];
+                ctx.beginPath();
+                ctx.moveTo(osc.x, osc.y);
+                ctx.lineTo(neighbor.x, neighbor.y);
+                ctx.stroke();
+              }
+              if (j < gridCols - 1) {
+                const neighbor = oscillators[i][j + 1];
+                ctx.beginPath();
+                ctx.moveTo(osc.x, osc.y);
+                ctx.lineTo(neighbor.x, neighbor.y);
+                ctx.stroke();
+              }
+            }
+          }
+
+          // Draw oscillators
+          for (let i = 0; i < gridRows; i++) {
+            for (let j = 0; j < gridCols; j++) {
+              const osc = oscillators[i][j];
+              ctx.beginPath();
+              ctx.arc(osc.x, osc.y, 6, 0, Math.PI * 2);
+              ctx.fillStyle = osc.isDragging ? '#ff0000' : '#0066cc';
+              ctx.fill();
+              ctx.strokeStyle = '#003366';
+              ctx.stroke();
+            }
+          }
+        }
+
+        // Animation loop
+        let lastTime = 0;
+        function animate(time) {
+          if (!lastTime) lastTime = time;
+          let dt = (time - lastTime) / 1000;
+          dt = Math.min(dt, 0.02); // Cap dt to handle frame drops
+          lastTime = time;
+
+          updatePhysics(dt);
+          draw();
+
+          requestAnimationFrame(animate);
+        }
+
+        // Mouse interaction
+        let isMouseDown = false;
+        let selectedOscillator = null;
+        let offsetX, offsetY;
+
+        function getMousePos(evt) {
+          const rect = canvas.getBoundingClientRect();
+          return {
+            x: (evt.clientX - rect.left) * (canvas.width / rect.width),
+            y: (evt.clientY - rect.top) * (canvas.height / rect.height)
+          };
+        }
+        document.addEventListener('mousedown', function (e) {
+          const mousePos = getMousePos(e);
+          isMouseDown = true;
+
+          for (let i = 0; i < gridRows; i++) {
+            for (let j = 0; j < gridCols; j++) {
+              const osc = oscillators[i][j];
+              const dx = mousePos.x - osc.x;
+              const dy = mousePos.y - osc.y;
+              const distance = Math.sqrt(dx * dx + dy * dy);
+              if (distance < 10) {
+                selectedOscillator = osc;
+                osc.isDragging = true;
+                osc.vx = 0;
+                osc.vy = 0;
+                offsetX = dx;
+                offsetY = dy;
+                return;
+              }
+            }
+          }
+        });
+
+        document.addEventListener('mousemove', function (e) {
+          if (isMouseDown && selectedOscillator) {
+            const mousePos = getMousePos(e);
+            selectedOscillator.x = mousePos.x - offsetX;// Math.max(0, Math.min(canvas.width, mousePos.x - offsetX));
+            selectedOscillator.y = mousePos.y - offsetY;// Math.max(0, Math.min(canvas.height, mousePos.y - offsetY));
+          }
+        });
+
+        document.addEventListener('mouseup', function () {
+          isMouseDown = false;
+          if (selectedOscillator) {
+            selectedOscillator.isDragging = false;
+            selectedOscillator = null;
+          }
+        });
+
+        // Initialize and start
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+        requestAnimationFrame(animate);
+      </script>

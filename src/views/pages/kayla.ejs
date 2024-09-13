@@ -4,12 +4,13 @@
 <%- contentFor('body') %>
 <body>
     <h2>Bitcoin Wallet</h2>
-    <p>Contained at the following link is the private key for a Bitcoin wallet containing ~30 USD of Bitcoin. Keep this secure. Let me know if you need help migrating this to a self-hosted wallet on your phone (though, you should be able to very easily figure this out).</p>
+    <p>Sent to your email is the private key for a Bitcoin wallet containing ~30 USD of Bitcoin. Keep this secure --once its in your wallet you should delete it. Let me know if you need help migrating this to a self-hosted wallet on your phone (though, you should be able to very easily figure this out).</p>
     
     <br>
 
-    <h3 style="color: #007bff;">Wallet Currently Provisioning...</h3>
-    <h4>This is expected to finish on July 12, 2024. You will be notified by email when this is complete.</h4>
+    <p>You will need the following key to decrypt it.</p>
+
+    <h3 style="color: #007bff;"><%= process.env.KAYLA_GIFT_PASSWORD %></h3>
 </body>
 
 

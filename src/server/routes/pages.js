@@ -55,6 +55,16 @@ router.get('/fourier', async (req, res) => {
   res.render('pages/fourier', {user: user});
 });
 
+router.get('/fourier_new', async (req, res) => {
+  const user = await getUser(req)
+  res.render('pages/fourier_new', {user: user});
+});
+
+router.get('/lattice', async (req, res) => {
+  const user = await getUser(req)
+  res.render('pages/lattice', {user: user});
+});
+
 // Manage users page (admin only)
 router.get('/manage_users', isAuthenticated, isAdmin, (req, res) => {
   res.render('pages/manage_users');
