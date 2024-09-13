@@ -1,5 +1,6 @@
 <%- contentFor('head') %>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Coupled Oscillators Simulation</title>
   <style>
     body {
@@ -30,6 +31,22 @@
       width: 100%;
       height: 100%;
     }
+
+    @media (max-width: 600px) {
+      .content-wrapper {
+        padding: 10px;
+      }
+
+      h3 {
+        font-size: 1.2rem;
+      }
+
+      /* Adjust canvas height for mobile */
+      .canvas-container {
+        padding-bottom: 75%;
+        /* Closer to 3:4 ratio for mobile */
+      }
+    }
   </style>
 
 
@@ -59,19 +76,41 @@
 
         // Initialize oscillators
         const oscillators = [];
+
         function resizeCanvas() {
-          // Set canvas size to 90% of the viewport width and height
-          canvas.width = window.innerWidth;
-          canvas.height = window.innerHeight;
+          const container = canvas.parentElement;
+          const containerWidth = container.clientWidth;
+          const containerHeight = container.clientHeight;
+          const containerAspectRatio = containerWidth / containerHeight;
+          const desiredAspectRatio = gridCols / gridRows;
 
-          // Calculate spacing with some padding
-          oscillatorSpacingX = (canvas.width - 40) / (gridCols - 1);
-          oscillatorSpacingY = (canvas.height - 40) / (gridRows - 1);
+          let canvasWidth, canvasHeight;
 
-          initOscillators();
+          if (containerAspectRatio > desiredAspectRatio) {
+            // Container is wider than desired, constrain by height
+            canvasHeight = containerHeight;
+            canvasWidth = canvasHeight * desiredAspectRatio;
+          } else {
+            // Container is taller than desired, constrain by width
+            canvasWidth = containerWidth;
+            canvasHeight = canvasWidth / desiredAspectRatio;
+          }
+
+          canvas.width = canvasWidth;
+          canvas.height = canvasHeight;
+
+          // Center the canvas within the container
+          canvas.style.position = 'absolute';
+          canvas.style.left = `${(containerWidth - canvasWidth) / 2}px`;
+          canvas.style.top = `${(containerHeight - canvasHeight) / 2}px`;
+
+          oscillatorSpacingX = canvasWidth / (gridCols + 1);
+          oscillatorSpacingY = canvasHeight / (gridRows + 1);
+
+          initOscillators(Math.min(window.innerWidth, window.innerHeight) / 800);
         }
 
-        function initOscillators() {
+        function initOscillators(scaleFactor = 1) {
           oscillators.length = 0;
           for (let i = 0; i < gridRows; i++) {
             oscillators[i] = [];
@@ -87,7 +126,8 @@
                 vy: 0,
                 ax: 0,
                 ay: 0,
-                isDragging: false
+                radius: 3 * scaleFactor, // Scale the size of the circles based on screen size
+                isDragging: false,
               };
             }
           }
@@ -145,7 +185,6 @@
         function draw() {
           ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-          // Draw connections
           ctx.strokeStyle = '#cccccc';
           for (let i = 0; i < gridRows; i++) {
             for (let j = 0; j < gridCols; j++) {
@@ -168,12 +207,11 @@
             }
           }
 
-          // Draw oscillators
           for (let i = 0; i < gridRows; i++) {
             for (let j = 0; j < gridCols; j++) {
               const osc = oscillators[i][j];
               ctx.beginPath();
-              ctx.arc(osc.x, osc.y, 6, 0, Math.PI * 2);
+              ctx.arc(osc.x, osc.y, osc.radius, 0, Math.PI * 2); // Use the scaled radius
               ctx.fillStyle = osc.isDragging ? '#ff0000' : '#0066cc';
               ctx.fill();
               ctx.strokeStyle = '#003366';
@@ -240,6 +278,48 @@
         });
 
         document.addEventListener('mouseup', function () {
+          isMouseDown = false;
+          if (selectedOscillator) {
+            selectedOscillator.isDragging = false;
+            selectedOscillator = null;
+          }
+        });
+
+        // Touch interaction
+        canvas.addEventListener('touchstart', function (e) {
+          const touch = e.touches[0];
+          const mousePos = getMousePos(touch);
+          isMouseDown = true;
+
+          for (let i = 0; i < gridRows; i++) {
+            for (let j = 0; j < gridCols; j++) {
+              const osc = oscillators[i][j];
+              const dx = mousePos.x - osc.x;
+              const dy = mousePos.y - osc.y;
+              const distance = Math.sqrt(dx * dx + dy * dy);
+              if (distance < 10) {
+                selectedOscillator = osc;
+                osc.isDragging = true;
+                osc.vx = 0;
+                osc.vy = 0;
+                offsetX = dx;
+                offsetY = dy;
+                return;
+              }
+            }
+          }
+        });
+
+        canvas.addEventListener('touchmove', function (e) {
+          if (isMouseDown && selectedOscillator) {
+            const touch = e.touches[0];
+            const mousePos = getMousePos(touch);
+            selectedOscillator.x = mousePos.x - offsetX;
+            selectedOscillator.y = mousePos.y - offsetY;
+          }
+        });
+
+        canvas.addEventListener('touchend', function () {
           isMouseDown = false;
           if (selectedOscillator) {
             selectedOscillator.isDragging = false;
