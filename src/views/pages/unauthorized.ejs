@@ -1,0 +1,62 @@
+<%- contentFor('head') %>
+<title>Unauthorized</title>
+
+<%- contentFor('body') %>
+<div id="unauthorized-container">
+  <p>You must be logged in to access this page.</p>
+  <div id="sign-in-area">
+      <p>Sign in:</p>
+      <form id="sign-in-form">
+          <input type="email" id="email" name="email" placeholder="Email" autocomplete="off" required>
+          <input type="password" id="password" name="password" placeholder="Password" autocomplete="off" required>
+          <input type="hidden" id="redirectTo" name="redirectTo" value="<%= redirectTo %>">
+          <button type="submit">Sign in</button>
+      </form>
+      <div class="links">
+          <p><a href="/reset-password">Forgot Password?</a></p>
+          <p><a href="/register">Register</a></p>
+      </div>
+      <p id="error-msg"></p>
+  </div>
+</div>
+
+<%- contentFor('scripts') %>
+<script>
+  document.getElementById('sign-in-form').addEventListener('submit', function (event) {
+      event.preventDefault();
+      login();
+  });
+
+  function login() {
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value.trim();
+      const redirectTo = document.getElementById('redirectTo').value;
+
+      fetch('/login', {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email, password }),
+      })
+          .then(response => response.json())
+          .then(data => {
+              if (data.success) {
+                  if (redirectTo) {
+                      window.location.href = redirectTo;
+                  } else {
+                      window.location.href = '/';
+                  }
+              } else {
+                  throw new Error(data.error || 'Login failed');
+              }
+          })
+          .catch((error) => {
+              const errorMsg = document.getElementById('error-msg');
+              errorMsg.innerText = error.message;
+              setTimeout(() => {
+                  errorMsg.innerText = '';
+              }, 5000);
+          });
+  }
+</script>

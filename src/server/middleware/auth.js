@@ -5,11 +5,14 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
 });
 
+// Middleware to check if the user is authenticated
 function isAuthenticated(req, res, next) {
   if (req.session.userId) {
-    next();
+    return next();
   } else {
-    res.status(401).json({ error: 'Unauthorized' });
+    // Store the original URL to redirect after login
+    const redirectTo = req.originalUrl;
+    return res.status(401).render('pages/unauthorized', { redirectTo });
   }
 }
 
