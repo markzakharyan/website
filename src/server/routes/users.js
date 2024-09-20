@@ -1,11 +1,12 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const { Pool } = require('pg');
 const { isAuthenticated, isAdmin } = require('../middleware/auth');
 const router = express.Router();
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: process.env.NODE_ENV === 'production' ? process.env.DATABASE_PRIVATE_URL : process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
 });
 
@@ -98,6 +99,36 @@ router.delete('/:id', isAuthenticated, isAdmin, async (req, res) => {
   } catch (err) {
     console.error('Error deleting user:', err);
     res.status(500).json({ error: 'Error deleting user' });
+  }
+});
+
+// Generate API Key and Secret
+router.post('/generate-api-key', isAuthenticated, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+
+    // Generate API key and secret
+    const apiKey = crypto.randomBytes(16).toString('hex');
+    const apiSecret = crypto.randomBytes(32).toString('hex');
+
+    // Hash the API secret before storing
+    const hashedApiSecret = await bcrypt.hash(apiSecret, 10);
+
+    // Store the API key and hashed secret in the database
+    await pool.query(
+      'UPDATE users SET api_key = $1, hashed_api_secret = $2 WHERE id = $3',
+      [apiKey, hashedApiSecret, userId]
+    );
+
+    // Return the API key and secret to the user (only once)
+    res.json({
+      message: 'API key generated successfully',
+      apiKey: apiKey,
+      apiSecret: apiSecret,
+    });
+  } catch (error) {
+    console.error('Error generating API key:', error);
+    res.status(500).json({ error: 'Error generating API key' });
   }
 });
 

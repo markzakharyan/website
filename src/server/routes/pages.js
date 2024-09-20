@@ -5,7 +5,7 @@ const { get } = require('./auth');
 const router = express.Router();
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: process.env.NODE_ENV === 'production' ? process.env.DATABASE_PRIVATE_URL : process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
 });
 
@@ -112,6 +112,24 @@ router.get('/reset/:token', async (req, res) => {
   } catch (error) {
     console.error('Error checking reset token:', error);
     res.render('pages/reset_password', { error: 'An error occurred. Please try again later.' });
+  }
+});
+
+// Request API Key page
+router.get('/request-api-key', isAuthenticated, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT api_key FROM users WHERE id = $1',
+      [req.session.userId]
+    );
+    const user = result.rows[0];
+    res.render('pages/request_api_key', {
+      hasApiKey: !!user.api_key, // Check if an API key exists
+      apiKeyGenerated: false,    // Indicates if a new API key was just generated
+    });
+  } catch (error) {
+    console.error('Error fetching API key:', error);
+    res.status(500).render('pages/error', { error: 'Internal server error' });
   }
 });
 

@@ -1,0 +1,65 @@
+<!-- views/pages/request_api_key.ejs -->
+
+<%- contentFor('head') %>
+  <title>Request API Key</title>
+
+  <%- contentFor('body') %>
+
+    <body>
+      <% if (apiKeyGenerated) { %>
+        <p>Your new API Key and Secret are:</p>
+        <p><strong>API Key:</strong>
+          <%= apiKey %>
+        </p>
+        <p><strong>API Secret:</strong>
+          <%= apiSecret %>
+        </p>
+        <p>Make sure to copy these credentials now. You won't be able to see the API Secret again!</p>
+        <% } else { %>
+          <% if (hasApiKey) { %>
+            <p>You have already generated an API key.</p>
+            <p>If you generate a new API key, your old credentials will stop working.</p>
+            <% } else { %>
+              <p>You have not generated an API key yet.</p>
+              <% } %>
+                <form id="apiKeyForm">
+                  <button type="submit">Generate API Key</button>
+                </form>
+                <div id="message" class="message"></div>
+                <% } %>
+                  <p><a href="/">Back to Home</a></p>
+    </body>
+
+    <%- contentFor('scripts') %>
+      <script>
+        document.getElementById('apiKeyForm').addEventListener('submit', async (e) => {
+          e.preventDefault();
+          try {
+            const response = await fetch('/users/generate-api-key', {
+              method: 'POST',
+            });
+            const result = await response.json();
+            if (response.ok) {
+              // Display the API key and secret
+              document.body.innerHTML = `
+          <h1>API Key Generated</h1>
+          <p>Your new API Key and Secret are:</p>
+          <p><strong>API Key:</strong> ${result.apiKey}</p>
+          <p><strong>API Secret:</strong> ${result.apiSecret}</p>
+          <p>Make sure to copy these credentials now. You won't be able to see the API Secret again!</p>
+          <p><a href="/">Back to Home</a></p>
+        `;
+            } else {
+              showMessage(result.error, 'error');
+            }
+          } catch (error) {
+            showMessage('An error occurred. Please try again.', 'error');
+          }
+        });
+
+        function showMessage(message, type) {
+          const messageElement = document.getElementById('message');
+          messageElement.textContent = message;
+          messageElement.className = `message ${type}`;
+        }
+      </script>
